@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support;
 
 import com.alibaba.dubbo.common.Version;
@@ -28,11 +29,12 @@ import com.alibaba.dubbo.rpc.cluster.LoadBalance;
 import java.util.List;
 
 /**
- * Execute exactly once, which means this policy will throw an exception immediately in case of an invocation error.
+ * Execute exactly once, which means this policy will throw an exception immediately in case of an
+ * invocation error.
  * Usually used for non-idempotent write operations
- *
+ * <p>
+ * 仅一次调用，失败后抛异常。适合类似新增记录场景
  * <a href="http://en.wikipedia.org/wiki/Fail-fast">Fail-fast</a>
- *
  */
 public class FailfastClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -41,7 +43,8 @@ public class FailfastClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     @Override
-    public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers,
+            LoadBalance loadbalance) throws RpcException {
         checkInvokers(invokers, invocation);
         Invoker<T> invoker = select(loadbalance, invocation, invokers, null);
         try {
@@ -50,7 +53,24 @@ public class FailfastClusterInvoker<T> extends AbstractClusterInvoker<T> {
             if (e instanceof RpcException && ((RpcException) e).isBiz()) { // biz exception.
                 throw (RpcException) e;
             }
-            throw new RpcException(e instanceof RpcException ? ((RpcException) e).getCode() : 0, "Failfast invoke providers " + invoker.getUrl() + " " + loadbalance.getClass().getSimpleName() + " select from all providers " + invokers + " for service " + getInterface().getName() + " method " + invocation.getMethodName() + " on consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion() + ", but no luck to perform the invocation. Last error is: " + e.getMessage(), e.getCause() != null ? e.getCause() : e);
+            throw new RpcException(e instanceof RpcException ? ((RpcException) e).getCode() : 0,
+                    "Failfast invoke providers "
+                            + invoker.getUrl()
+                            + " "
+                            + loadbalance.getClass()
+                            .getSimpleName()
+                            + " select from all providers "
+                            + invokers
+                            + " for service "
+                            + getInterface().getName()
+                            + " method "
+                            + invocation.getMethodName()
+                            + " on consumer "
+                            + NetUtils.getLocalHost()
+                            + " use dubbo version "
+                            + Version.getVersion()
+                            + ", but no luck to perform the invocation. Last error is: "
+                            + e.getMessage(), e.getCause() != null ? e.getCause() : e);
         }
     }
 }

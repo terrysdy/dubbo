@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.registry.integration;
 
 import com.alibaba.dubbo.common.Constants;
@@ -54,29 +55,36 @@ import java.util.Map;
 import java.util.Set;
 
 /**
+ * 动态服务目录
  * RegistryDirectory
- *
  */
 public class RegistryDirectory<T> extends AbstractDirectory<T> implements NotifyListener {
 
     private static final Logger logger = LoggerFactory.getLogger(RegistryDirectory.class);
 
-    private static final Cluster cluster = ExtensionLoader.getExtensionLoader(Cluster.class).getAdaptiveExtension();
+    private static final Cluster cluster = ExtensionLoader.getExtensionLoader(Cluster.class)
+            .getAdaptiveExtension();
 
-    private static final RouterFactory routerFactory = ExtensionLoader.getExtensionLoader(RouterFactory.class).getAdaptiveExtension();
+    private static final RouterFactory routerFactory = ExtensionLoader.getExtensionLoader(
+            RouterFactory.class).getAdaptiveExtension();
 
-    private static final ConfiguratorFactory configuratorFactory = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class).getAdaptiveExtension();
+    private static final ConfiguratorFactory configuratorFactory =
+            ExtensionLoader.getExtensionLoader(
+                    ConfiguratorFactory.class).getAdaptiveExtension();
     private final String serviceKey; // Initialization at construction time, assertion not null
     private final Class<T> serviceType; // Initialization at construction time, assertion not null
-    private final Map<String, String> queryMap; // Initialization at construction time, assertion not null
-    private final URL directoryUrl; // Initialization at construction time, assertion not null, and always assign non null value
+    private final Map<String, String> queryMap; // Initialization at construction time, assertion
+    // not null
+    private final URL directoryUrl; // Initialization at construction time, assertion not null,
+    // and always assign non null value
     private final String[] serviceMethods;
     private final boolean multiGroup;
     private Protocol protocol; // Initialization at the time of injection, the assertion is not null
     private Registry registry; // Initialization at the time of injection, the assertion is not null
     private volatile boolean forbidden = false;
 
-    private volatile URL overrideDirectoryUrl; // Initialization at construction time, assertion not null, and always assign non null value
+    private volatile URL overrideDirectoryUrl; // Initialization at construction time, assertion
+    // not null, and always assign non null value
 
     /**
      * override rules
@@ -84,27 +92,37 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * Rule one: for a certain provider <ip:port,timeout=100>
      * Rule two: for all providers <* ,timeout=5000>
      */
-    private volatile List<Configurator> configurators; // The initial value is null and the midway may be assigned to null, please use the local variable reference
+    private volatile List<Configurator> configurators; // The initial value is null and the
+    // midway may be assigned to null, please use the local variable reference
 
     // Map<url, Invoker> cache service url to invoker mapping.
-    private volatile Map<String, Invoker<T>> urlInvokerMap; // The initial value is null and the midway may be assigned to null, please use the local variable reference
+    private volatile Map<String, Invoker<T>> urlInvokerMap; // The initial value is null and the
+    // midway may be assigned to null, please use the local variable reference
 
     // Map<methodName, Invoker> cache service method to invokers mapping.
-    private volatile Map<String, List<Invoker<T>>> methodInvokerMap; // The initial value is null and the midway may be assigned to null, please use the local variable reference
+    private volatile Map<String, List<Invoker<T>>> methodInvokerMap; // The initial value is null
+    // and the midway may be assigned to null, please use the local variable reference
 
     // Set<invokerUrls> cache invokeUrls to invokers mapping.
-    private volatile Set<URL> cachedInvokerUrls; // The initial value is null and the midway may be assigned to null, please use the local variable reference
+    private volatile Set<URL> cachedInvokerUrls; // The initial value is null and the midway may
+    // be assigned to null, please use the local variable reference
 
     public RegistryDirectory(Class<T> serviceType, URL url) {
         super(url);
-        if (serviceType == null)
+        if (serviceType == null) {
             throw new IllegalArgumentException("service type is null.");
-        if (url.getServiceKey() == null || url.getServiceKey().length() == 0)
+        }
+        if (url.getServiceKey() == null || url.getServiceKey().length() == 0) {
             throw new IllegalArgumentException("registry serviceKey is null.");
+        }
         this.serviceType = serviceType;
         this.serviceKey = url.getServiceKey();
-        this.queryMap = StringUtils.parseQueryString(url.getParameterAndDecoded(Constants.REFER_KEY));
-        this.overrideDirectoryUrl = this.directoryUrl = url.setPath(url.getServiceInterface()).clearParameters().addParameters(queryMap).removeParameter(Constants.MONITOR_KEY);
+        this.queryMap = StringUtils.parseQueryString(
+                url.getParameterAndDecoded(Constants.REFER_KEY));
+        this.overrideDirectoryUrl = this.directoryUrl = url.setPath(url.getServiceInterface())
+                .clearParameters()
+                .addParameters(queryMap)
+                .removeParameter(Constants.MONITOR_KEY);
         String group = directoryUrl.getParameter(Constants.GROUP_KEY, "");
         this.multiGroup = group != null && ("*".equals(group) || group.contains(","));
         String methods = queryMap.get(Constants.METHODS_KEY);
@@ -116,11 +134,11 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
      * Send all rules every time, the urls will be reassembled and calculated
      *
      * @param urls Contract:
-     *             </br>1.override://0.0.0.0/...( or override://ip:port...?anyhost=true)&para1=value1... means global rules (all of the providers take effect)
-     *             </br>2.override://ip:port...?anyhost=false Special rules (only for a certain provider)
-     *             </br>3.override:// rule is not supported... ,needs to be calculated by registry itself.
-     *             </br>4.override://0.0.0.0/ without parameters means clearing the override
-     * @return
+     * </br>1.override://0.0.0.0/...( or override://ip:port...?anyhost=true)&para1=value1... means
+     * global rules (all of the providers take effect)
+     * </br>2.override://ip:port...?anyhost=false Special rules (only for a certain provider)
+     * </br>3.override:// rule is not supported... ,needs to be calculated by registry itself.
+     * </br>4.override://0.0.0.0/ without parameters means clearing the override
      */
     public static List<Configurator> toConfigurators(List<URL> urls) {
         if (urls == null || urls.isEmpty()) {
@@ -134,7 +152,8 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 break;
             }
             Map<String, String> override = new HashMap<String, String>(url.getParameters());
-            //The anyhost parameter of override may be added automatically, it can't change the judgement of changing url
+            //The anyhost parameter of override may be added automatically, it can't change the
+            // judgement of changing url
             override.remove(Constants.ANYHOST_KEY);
             if (override.size() == 0) {
                 configurators.clear();
@@ -170,7 +189,10 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 registry.unsubscribe(getConsumerUrl(), this);
             }
         } catch (Throwable t) {
-            logger.warn("unexpeced error when unsubscribe service " + serviceKey + "from registry" + registry.getUrl(), t);
+            logger.warn("unexpeced error when unsubscribe service "
+                    + serviceKey
+                    + "from registry"
+                    + registry.getUrl(), t);
         }
         super.destroy(); // must be executed after unsubscribing
         try {
@@ -187,6 +209,7 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         List<URL> configuratorUrls = new ArrayList<URL>();
         for (URL url : urls) {
             String protocol = url.getProtocol();
+            // 根据 category 分类
             String category = url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
             if (Constants.ROUTERS_CATEGORY.equals(category)
                     || Constants.ROUTE_PROTOCOL.equals(protocol)) {
@@ -197,7 +220,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             } else if (Constants.PROVIDERS_CATEGORY.equals(category)) {
                 invokerUrls.add(url);
             } else {
-                logger.warn("Unsupported category " + category + " in notified url: " + url + " from registry " + getUrl().getAddress() + " to consumer " + NetUtils.getLocalHost());
+                logger.warn("Unsupported category "
+                        + category
+                        + " in notified url: "
+                        + url
+                        + " from registry "
+                        + getUrl().getAddress()
+                        + " to consumer "
+                        + NetUtils.getLocalHost());
             }
         }
         // configurators
@@ -225,14 +255,25 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     /**
      * Convert the invokerURL list to the Invoker Map. The rules of the conversion are as follows:
-     * 1.If URL has been converted to invoker, it is no longer re-referenced and obtained directly from the cache, and notice that any parameter changes in the URL will be re-referenced.
+     * 1.If URL has been converted to invoker, it is no longer re-referenced and obtained directly
+     * from the cache, and notice that any parameter changes in the URL will be re-referenced.
      * 2.If the incoming invoker list is not empty, it means that it is the latest invoker list
-     * 3.If the list of incoming invokerUrl is empty, It means that the rule is only a override rule or a route rule, which needs to be re-contrasted to decide whether to re-reference.
+     * 3.If the list of incoming invokerUrl is empty, It means that the rule is only a override rule
+     * or a route rule, which needs to be re-contrasted to decide whether to re-reference.
+     * <p>
+     * 1. 检测入参是否仅包含一个 url，且 url 协议头为 empty
+     * 2. 若第一步检测结果为 true，表示禁用所有服务，此时销毁所有的 Invoker
+     * 3. 若第一步检测结果为 false，此时将入参转为 Invoker 列表
+     * 4. 对将上一步逻辑生成的结果进行进一步处理，得到方法名到 Invoker 的映射关系表
+     * 5. 合并多组 Invoker
+     * 6. 销毁无用 Invoker
      *
      * @param invokerUrls this parameter can't be null
      */
-    // TODO: 2017/8/31 FIXME The thread pool should be used to refresh the address, otherwise the task may be accumulated.
+    // TODO: 2017/8/31 FIXME The thread pool should be used to refresh the address, otherwise the
+    // task may be accumulated.
     private void refreshInvoker(List<URL> invokerUrls) {
+        // invokerUrls 仅有一个元素，且 url 协议头为 empty，此时表示禁用所有服务
         if (invokerUrls != null && invokerUrls.size() == 1 && invokerUrls.get(0) != null
                 && Constants.EMPTY_PROTOCOL.equals(invokerUrls.get(0).getProtocol())) {
             this.forbidden = true; // Forbid to access
@@ -241,34 +282,50 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         } else {
             this.forbidden = false; // Allow to access
             Map<String, Invoker<T>> oldUrlInvokerMap = this.urlInvokerMap; // local reference
+
             if (invokerUrls.isEmpty() && this.cachedInvokerUrls != null) {
+                // 添加缓存 url 到 invokerUrls 中
                 invokerUrls.addAll(this.cachedInvokerUrls);
             } else {
                 this.cachedInvokerUrls = new HashSet<URL>();
-                this.cachedInvokerUrls.addAll(invokerUrls);//Cached invoker urls, convenient for comparison
+                // 缓存 invokerUrls
+                this.cachedInvokerUrls.addAll(
+                        invokerUrls);//Cached invoker urls, convenient for comparison
             }
             if (invokerUrls.isEmpty()) {
                 return;
             }
-            Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls);// Translate url list to Invoker map
-            Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(newUrlInvokerMap); // Change method name to map Invoker Map
+
+            // url 转 Invoker
+            Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(
+                    invokerUrls);// Translate url list to Invoker map
+            // 方法名 --> Invoker
+            Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(
+                    newUrlInvokerMap); // Change method name to map Invoker Map
             // state change
             // If the calculation is wrong, it is not processed.
             if (newUrlInvokerMap == null || newUrlInvokerMap.size() == 0) {
-                logger.error(new IllegalStateException("urls to invokers error .invokerUrls.size :" + invokerUrls.size() + ", invoker.size :0. urls :" + invokerUrls.toString()));
+                logger.error(new IllegalStateException("urls to invokers error .invokerUrls.size :"
+                        + invokerUrls.size()
+                        + ", invoker.size :0. urls :"
+                        + invokerUrls.toString()));
                 return;
             }
-            this.methodInvokerMap = multiGroup ? toMergeMethodInvokerMap(newMethodInvokerMap) : newMethodInvokerMap;
+            this.methodInvokerMap =
+                    multiGroup ? toMergeMethodInvokerMap(newMethodInvokerMap) : newMethodInvokerMap;
             this.urlInvokerMap = newUrlInvokerMap;
             try {
-                destroyUnusedInvokers(oldUrlInvokerMap, newUrlInvokerMap); // Close the unused Invoker
+                // 销毁无用 Invoker，避免调用已下线 provider
+                destroyUnusedInvokers(oldUrlInvokerMap,
+                        newUrlInvokerMap); // Close the unused Invoker
             } catch (Exception e) {
                 logger.warn("destroyUnusedInvokers error. ", e);
             }
         }
     }
 
-    private Map<String, List<Invoker<T>>> toMergeMethodInvokerMap(Map<String, List<Invoker<T>>> methodMap) {
+    private Map<String, List<Invoker<T>>> toMergeMethodInvokerMap(
+            Map<String, List<Invoker<T>>> methodMap) {
         Map<String, List<Invoker<T>>> result = new HashMap<String, List<Invoker<T>>>();
         for (Map.Entry<String, List<Invoker<T>>> entry : methodMap.entrySet()) {
             String method = entry.getKey();
@@ -286,8 +343,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             if (groupMap.size() == 1) {
                 result.put(method, groupMap.values().iterator().next());
             } else if (groupMap.size() > 1) {
+                // groupMap.size() > 1 成立，表示 groupMap 中包含多组键值对，比如：
+                // {
+                //     "dubbo": [invoker1, invoker2, invoker3, ...],
+                //     "hello": [invoker4, invoker5, invoker6, ...]
+                // }
                 List<Invoker<T>> groupInvokers = new ArrayList<Invoker<T>>();
                 for (List<Invoker<T>> groupList : groupMap.values()) {
+                    // 通过集群类合并每个分组对应的 Invoker 列表
                     groupInvokers.add(cluster.join(new StaticDirectory<T>(groupList)));
                 }
                 result.put(method, groupInvokers);
@@ -299,7 +362,6 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
     }
 
     /**
-     * @param urls
      * @return null : no routers ,do nothing
      * else :routers list
      */
@@ -319,8 +381,9 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 }
                 try {
                     Router router = routerFactory.getRouter(url);
-                    if (!routers.contains(router))
+                    if (!routers.contains(router)) {
                         routers.add(router);
+                    }
                 } catch (Throwable t) {
                     logger.error("convert router url to router error, url: " + url, t);
                 }
@@ -331,8 +394,10 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     /**
      * Turn urls into invokers, and if url has been refer, will not re-reference.
+     * <p>
+     * 1. 检查 provider url 协议 consumer 是否支持
+     * 2. 生成 url 对应 Invoker（原有复用缓存）
      *
-     * @param urls
      * @return invokers
      */
     private Map<String, Invoker<T>> toInvokers(List<URL> urls) {
@@ -340,10 +405,12 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         if (urls == null || urls.isEmpty()) {
             return newUrlInvokerMap;
         }
+
         Set<String> keys = new HashSet<String>();
+        // 获取 consumer 支持的协议
         String queryProtocols = this.queryMap.get(Constants.PROTOCOL_KEY);
         for (URL providerUrl : urls) {
-            // If protocol is configured at the reference side, only the matching protocol is selected
+            // 检查 provider 协议 consumer 是否支持
             if (queryProtocols != null && queryProtocols.length() > 0) {
                 boolean accept = false;
                 String[] acceptProtocols = queryProtocols.split(",");
@@ -360,19 +427,35 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             if (Constants.EMPTY_PROTOCOL.equals(providerUrl.getProtocol())) {
                 continue;
             }
-            if (!ExtensionLoader.getExtensionLoader(Protocol.class).hasExtension(providerUrl.getProtocol())) {
-                logger.error(new IllegalStateException("Unsupported protocol " + providerUrl.getProtocol() + " in notified url: " + providerUrl + " from registry " + getUrl().getAddress() + " to consumer " + NetUtils.getLocalHost()
-                        + ", supported protocol: " + ExtensionLoader.getExtensionLoader(Protocol.class).getSupportedExtensions()));
+
+            // spi 加载对应 consumer 协议
+            if (!ExtensionLoader.getExtensionLoader(Protocol.class)
+                    .hasExtension(providerUrl.getProtocol())) {
+                logger.error(new IllegalStateException("Unsupported protocol "
+                        + providerUrl.getProtocol()
+                        + " in notified url: "
+                        + providerUrl
+                        + " from registry "
+                        + getUrl().getAddress()
+                        + " to consumer "
+                        + NetUtils.getLocalHost()
+                        + ", supported protocol: "
+                        + ExtensionLoader.getExtensionLoader(Protocol.class)
+                        .getSupportedExtensions()));
                 continue;
             }
-            URL url = mergeUrl(providerUrl);
 
+            // 合并 url
+            URL url = mergeUrl(providerUrl);
             String key = url.toFullString(); // The parameter urls are sorted
             if (keys.contains(key)) { // Repeated url
                 continue;
             }
             keys.add(key);
-            // Cache key is url that does not merge with consumer side parameters, regardless of how the consumer combines parameters, if the server url changes, then refer again
+
+            // Cache key is url that does not merge with consumer side parameters, regardless of
+            // how the consumer combines parameters, if the server url changes, then refer again
+            // 生成 url 对应 Invoker
             Map<String, Invoker<T>> localUrlInvokerMap = this.urlInvokerMap; // local reference
             Invoker<T> invoker = localUrlInvokerMap == null ? null : localUrlInvokerMap.get(key);
             if (invoker == null) { // Not in the cache, refer again
@@ -384,10 +467,16 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                         enabled = url.getParameter(Constants.ENABLED_KEY, true);
                     }
                     if (enabled) {
-                        invoker = new InvokerDelegate<T>(protocol.refer(serviceType, url), url, providerUrl);
+                        invoker = new InvokerDelegate<T>(protocol.refer(serviceType, url), url,
+                                providerUrl);
                     }
                 } catch (Throwable t) {
-                    logger.error("Failed to refer invoker for interface:" + serviceType + ",url:(" + url + ")" + t.getMessage(), t);
+                    logger.error("Failed to refer invoker for interface:"
+                            + serviceType
+                            + ",url:("
+                            + url
+                            + ")"
+                            + t.getMessage(), t);
                 }
                 if (invoker != null) { // Put new invoker in cache
                     newUrlInvokerMap.put(key, invoker);
@@ -402,12 +491,10 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     /**
      * Merge url parameters. the order is: override > -D >Consumer > Provider
-     *
-     * @param providerUrl
-     * @return
      */
     private URL mergeUrl(URL providerUrl) {
-        providerUrl = ClusterUtils.mergeUrl(providerUrl, queryMap); // Merge the consumer side parameters
+        providerUrl = ClusterUtils.mergeUrl(providerUrl,
+                queryMap); // Merge the consumer side parameters
 
         List<Configurator> localConfigurators = this.configurators; // local reference
         if (localConfigurators != null && !localConfigurators.isEmpty()) {
@@ -416,10 +503,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
             }
         }
 
-        providerUrl = providerUrl.addParameter(Constants.CHECK_KEY, String.valueOf(false)); // Do not check whether the connection is successful or not, always create Invoker!
+        providerUrl = providerUrl.addParameter(Constants.CHECK_KEY, String.valueOf(
+                false)); // Do not check whether the connection is successful or not, always
+        // create Invoker!
 
-        // The combination of directoryUrl and override is at the end of notify, which can't be handled here
-        this.overrideDirectoryUrl = this.overrideDirectoryUrl.addParametersIfAbsent(providerUrl.getParameters()); // Merge the provider side parameters
+        // The combination of directoryUrl and override is at the end of notify, which can't be
+        // handled here
+        this.overrideDirectoryUrl = this.overrideDirectoryUrl.addParametersIfAbsent(
+                providerUrl.getParameters()); // Merge the provider side parameters
 
         if ((providerUrl.getPath() == null || providerUrl.getPath().length() == 0)
                 && "dubbo".equals(providerUrl.getProtocol())) { // Compatible version 1.0
@@ -455,13 +546,15 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     /**
      * Transform the invokers list into a mapping relationship with a method
+     * 将 url --> Invoker 转换成 method --> Invoker
      *
      * @param invokersMap Invoker Map
      * @return Mapping relation between Invoker and method
      */
     private Map<String, List<Invoker<T>>> toMethodInvokers(Map<String, Invoker<T>> invokersMap) {
         Map<String, List<Invoker<T>>> newMethodInvokerMap = new HashMap<String, List<Invoker<T>>>();
-        // According to the methods classification declared by the provider URL, the methods is compatible with the registry to execute the filtered methods
+        // According to the methods classification declared by the provider URL, the methods is
+        // compatible with the registry to execute the filtered methods
         List<Invoker<T>> invokersList = new ArrayList<Invoker<T>>();
         if (invokersMap != null && invokersMap.size() > 0) {
             for (Invoker<T> invoker : invokersMap.values()) {
@@ -515,7 +608,10 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                 try {
                     invoker.destroy();
                 } catch (Throwable t) {
-                    logger.warn("Failed to destroy service " + serviceKey + " to provider " + invoker.getUrl(), t);
+                    logger.warn("Failed to destroy service "
+                            + serviceKey
+                            + " to provider "
+                            + invoker.getUrl(), t);
                 }
             }
             localUrlInvokerMap.clear();
@@ -525,12 +621,11 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
 
     /**
      * Check whether the invoker in the cache needs to be destroyed
-     * If set attribute of url: refer.autodestroy=false, the invokers will only increase without decreasing,there may be a refer leak
-     *
-     * @param oldUrlInvokerMap
-     * @param newUrlInvokerMap
+     * If set attribute of url: refer.autodestroy=false, the invokers will only increase without
+     * decreasing,there may be a refer leak
      */
-    private void destroyUnusedInvokers(Map<String, Invoker<T>> oldUrlInvokerMap, Map<String, Invoker<T>> newUrlInvokerMap) {
+    private void destroyUnusedInvokers(Map<String, Invoker<T>> oldUrlInvokerMap,
+            Map<String, Invoker<T>> newUrlInvokerMap) {
         if (newUrlInvokerMap == null || newUrlInvokerMap.size() == 0) {
             destroyAllInvokers();
             return;
@@ -560,7 +655,10 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
                                 logger.debug("destroy invoker[" + invoker.getUrl() + "] success. ");
                             }
                         } catch (Exception e) {
-                            logger.warn("destroy invoker[" + invoker.getUrl() + "] faild. " + e.getMessage(), e);
+                            logger.warn("destroy invoker["
+                                    + invoker.getUrl()
+                                    + "] faild. "
+                                    + e.getMessage(), e);
                         }
                     }
                 }
@@ -573,21 +671,35 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         if (forbidden) {
             // 1. No service provider 2. Service providers are disabled
             throw new RpcException(RpcException.FORBIDDEN_EXCEPTION,
-                "No provider available from registry " + getUrl().getAddress() + " for service " + getConsumerUrl().getServiceKey() + " on consumer " +  NetUtils.getLocalHost()
-                        + " use dubbo version " + Version.getVersion() + ", please check status of providers(disabled, not registered or in blacklist).");
+                    "No provider available from registry "
+                            + getUrl().getAddress()
+                            + " for service "
+                            + getConsumerUrl().getServiceKey()
+                            + " on consumer "
+                            + NetUtils.getLocalHost()
+                            + " use dubbo version "
+                            + Version.getVersion()
+                            + ", please check status of providers(disabled, not registered or in "
+                            + "blacklist).");
         }
         List<Invoker<T>> invokers = null;
-        Map<String, List<Invoker<T>>> localMethodInvokerMap = this.methodInvokerMap; // local reference
+        Map<String, List<Invoker<T>>> localMethodInvokerMap = this.methodInvokerMap; // local
+        // reference
+        // 根据方法名获取 Invoker 列表
         if (localMethodInvokerMap != null && localMethodInvokerMap.size() > 0) {
             String methodName = RpcUtils.getMethodName(invocation);
             Object[] args = RpcUtils.getArguments(invocation);
             if (args != null && args.length > 0 && args[0] != null
                     && (args[0] instanceof String || args[0].getClass().isEnum())) {
-                invokers = localMethodInvokerMap.get(methodName + "." + args[0]); // The routing can be enumerated according to the first parameter
+                invokers = localMethodInvokerMap.get(methodName
+                        + "."
+                        + args[0]); // The routing can be enumerated according to the first
+                // parameter
             }
             if (invokers == null) {
                 invokers = localMethodInvokerMap.get(methodName);
             }
+            // 泛化调用通过 * 获取
             if (invokers == null) {
                 invokers = localMethodInvokerMap.get(Constants.ANY_VALUE);
             }
@@ -656,15 +768,14 @@ public class RegistryDirectory<T> extends AbstractDirectory<T> implements Notify
         public int compare(Invoker<?> o1, Invoker<?> o2) {
             return o1.getUrl().toString().compareTo(o2.getUrl().toString());
         }
-
     }
 
     /**
-     * The delegate class, which is mainly used to store the URL address sent by the registry,and can be reassembled on the basis of providerURL queryMap overrideMap for re-refer.
-     *
-     * @param <T>
+     * The delegate class, which is mainly used to store the URL address sent by the registry,and
+     * can be reassembled on the basis of providerURL queryMap overrideMap for re-refer.
      */
     private static class InvokerDelegate<T> extends InvokerWrapper<T> {
+
         private URL providerUrl;
 
         public InvokerDelegate(Invoker<T> invoker, URL url, URL providerUrl) {

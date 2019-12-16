@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting;
 
 import com.alibaba.dubbo.common.URL;
@@ -47,12 +48,16 @@ public class Transporters {
         if (handlers == null || handlers.length == 0) {
             throw new IllegalArgumentException("handlers == null");
         }
+
+        // 如果 handlers 元素数量大于1，则创建 ChannelHandler 分发器
         ChannelHandler handler;
         if (handlers.length == 1) {
             handler = handlers[0];
         } else {
             handler = new ChannelHandlerDispatcher(handlers);
         }
+
+        // 获取自适应 Transporter 实例(netty、mina)，并调用实例方法
         return getTransporter().bind(url, handler);
     }
 
@@ -64,6 +69,8 @@ public class Transporters {
         if (url == null) {
             throw new IllegalArgumentException("url == null");
         }
+
+        // 如果 handlers 元素数量大于1，则创建 ChannelHandler 分发器
         ChannelHandler handler;
         if (handlers == null || handlers.length == 0) {
             handler = new ChannelHandlerAdapter();
@@ -72,11 +79,12 @@ public class Transporters {
         } else {
             handler = new ChannelHandlerDispatcher(handlers);
         }
+
+        // 获取 Transporter 自适应拓展类，并调用 connect 方法生成 Client 实例
         return getTransporter().connect(url, handler);
     }
 
     public static Transporter getTransporter() {
         return ExtensionLoader.getExtensionLoader(Transporter.class).getAdaptiveExtension();
     }
-
 }

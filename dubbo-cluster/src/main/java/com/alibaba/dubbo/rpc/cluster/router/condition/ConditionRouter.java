@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.router.condition;
 
 import com.alibaba.dubbo.common.Constants;
@@ -40,7 +41,6 @@ import java.util.regex.Pattern;
 
 /**
  * ConditionRouter
- *
  */
 public class ConditionRouter implements Router, Comparable<Router> {
 
@@ -57,17 +57,26 @@ public class ConditionRouter implements Router, Comparable<Router> {
         this.priority = url.getParameter(Constants.PRIORITY_KEY, 0);
         this.force = url.getParameter(Constants.FORCE_KEY, false);
         try {
+            // 路由规则
             String rule = url.getParameterAndDecoded(Constants.RULE_KEY);
             if (rule == null || rule.trim().length() == 0) {
                 throw new IllegalArgumentException("Illegal route rule!");
             }
             rule = rule.replace("consumer.", "").replace("provider.", "");
+            // ==> 分隔符
             int i = rule.indexOf("=>");
+
             String whenRule = i < 0 ? null : rule.substring(0, i).trim();
             String thenRule = i < 0 ? rule.trim() : rule.substring(i + 2).trim();
-            Map<String, MatchPair> when = StringUtils.isBlank(whenRule) || "true".equals(whenRule) ? new HashMap<String, MatchPair>() : parseRule(whenRule);
-            Map<String, MatchPair> then = StringUtils.isBlank(thenRule) || "false".equals(thenRule) ? null : parseRule(thenRule);
-            // NOTE: It should be determined on the business level whether the `When condition` can be empty or not.
+
+            Map<String, MatchPair> when = StringUtils.isBlank(whenRule) || "true".equals(whenRule)
+                    ? new HashMap<String, MatchPair>() : parseRule(whenRule);
+            Map<String, MatchPair> then =
+                    StringUtils.isBlank(thenRule) || "false".equals(thenRule) ? null
+                            : parseRule(thenRule);
+
+            // NOTE: It should be determined on the business level whether the `When condition`
+            // can be empty or not.
             this.whenCondition = when;
             this.thenCondition = then;
         } catch (ParseException e) {
@@ -75,6 +84,31 @@ public class ConditionRouter implements Router, Comparable<Router> {
         }
     }
 
+    // 通过正则表达式匹配路由规则，ROUTE_PATTERN = ([&!=,]*)\s*([^&!=,\s]+)
+    // 这个表达式看起来不是很好理解，第一个括号内的表达式用于匹配"&", "!", "=" 和 "," 等符号。
+    // 第二括号内的用于匹配英文字母，数字等字符。举个例子说明一下：
+    //    host = 2.2.2.2 & host != 1.1.1.1 & method = hello
+    // 匹配结果如下：
+    //     括号一      括号二
+    // 1.  null       host
+    // 2.   =         2.2.2.2
+    // 3.   &         host
+    // 4.   !=        1.1.1.1
+    // 5.   &         method
+    // 6.   =         hello
+    // 解析结果  ==>
+    /*
+    {
+    "host": {
+        "matches": ["2.2.2.2"],
+        "mismatches": ["1.1.1.1"]
+    },
+    "method": {
+        "matches": ["hello"],
+        "mismatches": []
+    }
+}
+     */
     private static Map<String, MatchPair> parseRule(String rule)
             throws ParseException {
         Map<String, MatchPair> condition = new HashMap<String, MatchPair>();
@@ -85,9 +119,23 @@ public class ConditionRouter implements Router, Comparable<Router> {
         MatchPair pair = null;
         // Multiple values
         Set<String> values = null;
+        // 通过正则表达式匹配路由规则，ROUTE_PATTERN = ([&!=,]*)\s*([^&!=,\s]+)
+        // 这个表达式看起来不是很好理解，第一个括号内的表达式用于匹配"&", "!", "=" 和 "," 等符号。
+        // 第二括号内的用于匹配英文字母，数字等字符。举个例子说明一下：
+        //    host = 2.2.2.2 & host != 1.1.1.1 & method = hello
+        // 匹配结果如下：
+        //     括号一      括号二
+        // 1.  null       host
+        // 2.   =         2.2.2.2
+        // 3.   &         host
+        // 4.   !=        1.1.1.1
+        // 5.   &         method
+        // 6.   =         hello
         final Matcher matcher = ROUTE_PATTERN.matcher(rule);
         while (matcher.find()) { // Try to match one by one
+            // 获取括号一内的匹配结果
             String separator = matcher.group(1);
+            // 获取括号二内的匹配结果
             String content = matcher.group(2);
             // Start part of the condition expression.
             if (separator == null || separator.length() == 0) {
@@ -105,33 +153,36 @@ public class ConditionRouter implements Router, Comparable<Router> {
             }
             // The Value in the KV part.
             else if ("=".equals(separator)) {
-                if (pair == null)
+                if (pair == null) {
                     throw new ParseException("Illegal route rule \""
                             + rule + "\", The error char '" + separator
                             + "' at index " + matcher.start() + " before \""
                             + content + "\".", matcher.start());
+                }
 
                 values = pair.matches;
                 values.add(content);
             }
             // The Value in the KV part.
             else if ("!=".equals(separator)) {
-                if (pair == null)
+                if (pair == null) {
                     throw new ParseException("Illegal route rule \""
                             + rule + "\", The error char '" + separator
                             + "' at index " + matcher.start() + " before \""
                             + content + "\".", matcher.start());
+                }
 
                 values = pair.mismatches;
                 values.add(content);
             }
             // The Value in the KV part, if Value have more than one items.
             else if (",".equals(separator)) { // Should be seperateed by ','
-                if (values == null || values.isEmpty())
+                if (values == null || values.isEmpty()) {
                     throw new ParseException("Illegal route rule \""
                             + rule + "\", The error char '" + separator
                             + "' at index " + matcher.start() + " before \""
                             + content + "\".", matcher.start());
+                }
                 values.add(content);
             } else {
                 throw new ParseException("Illegal route rule \"" + rule
@@ -149,14 +200,23 @@ public class ConditionRouter implements Router, Comparable<Router> {
             return invokers;
         }
         try {
+            // 先对 consumer 条件进行匹配，匹配 when。不匹配直接响应
             if (!matchWhen(url, invocation)) {
                 return invokers;
             }
+
             List<Invoker<T>> result = new ArrayList<Invoker<T>>();
+
+            // 服务提供者匹配条件未配置，表明对指定的服务消费者禁用服务，也就是服务消费者在黑名单中
             if (thenCondition == null) {
-                logger.warn("The current consumer in the service blacklist. consumer: " + NetUtils.getLocalHost() + ", service: " + url.getServiceKey());
+                logger.warn("The current consumer in the service blacklist. consumer: "
+                        + NetUtils.getLocalHost()
+                        + ", service: "
+                        + url.getServiceKey());
                 return result;
             }
+
+            // 遍历 provider 对应 invoker，匹配 then 则添加
             for (Invoker<T> invoker : invokers) {
                 if (matchThen(invoker.getUrl(), url)) {
                     result.add(invoker);
@@ -165,11 +225,21 @@ public class ConditionRouter implements Router, Comparable<Router> {
             if (!result.isEmpty()) {
                 return result;
             } else if (force) {
-                logger.warn("The route result is empty and force execute. consumer: " + NetUtils.getLocalHost() + ", service: " + url.getServiceKey() + ", router: " + url.getParameterAndDecoded(Constants.RULE_KEY));
+                logger.warn("The route result is empty and force execute. consumer: "
+                        + NetUtils.getLocalHost()
+                        + ", service: "
+                        + url.getServiceKey()
+                        + ", router: "
+                        + url.getParameterAndDecoded(Constants.RULE_KEY));
                 return result;
             }
         } catch (Throwable t) {
-            logger.error("Failed to execute condition router rule: " + getUrl() + ", invokers: " + invokers + ", cause: " + t.getMessage(), t);
+            logger.error("Failed to execute condition router rule: "
+                    + getUrl()
+                    + ", invokers: "
+                    + invokers
+                    + ", cause: "
+                    + t.getMessage(), t);
         }
         return invokers;
     }
@@ -185,25 +255,30 @@ public class ConditionRouter implements Router, Comparable<Router> {
             return 1;
         }
         ConditionRouter c = (ConditionRouter) o;
-        return this.priority == c.priority ? url.toFullString().compareTo(c.url.toFullString()) : (this.priority > c.priority ? 1 : -1);
+        return this.priority == c.priority ? url.toFullString().compareTo(c.url.toFullString())
+                : (this.priority > c.priority ? 1 : -1);
     }
 
     boolean matchWhen(URL url, Invocation invocation) {
-        return whenCondition == null || whenCondition.isEmpty() || matchCondition(whenCondition, url, null, invocation);
+        return whenCondition == null || whenCondition.isEmpty() || matchCondition(whenCondition,
+                url, null, invocation);
     }
 
     private boolean matchThen(URL url, URL param) {
-        return !(thenCondition == null || thenCondition.isEmpty()) && matchCondition(thenCondition, url, param, null);
+        return !(thenCondition == null || thenCondition.isEmpty()) && matchCondition(thenCondition,
+                url, param, null);
     }
 
-    private boolean matchCondition(Map<String, MatchPair> condition, URL url, URL param, Invocation invocation) {
+    private boolean matchCondition(Map<String, MatchPair> condition, URL url, URL param,
+            Invocation invocation) {
         Map<String, String> sample = url.toMap();
         boolean result = false;
         for (Map.Entry<String, MatchPair> matchPair : condition.entrySet()) {
             String key = matchPair.getKey();
             String sampleValue;
-            //get real invoked method name from invocation
-            if (invocation != null && (Constants.METHOD_KEY.equals(key) || Constants.METHODS_KEY.equals(key))) {
+            // 从 invocation 获取对应的值（method/host/）
+            if (invocation != null && (Constants.METHOD_KEY.equals(key)
+                    || Constants.METHODS_KEY.equals(key))) {
                 sampleValue = invocation.getMethodName();
             } else {
                 sampleValue = sample.get(key);
@@ -211,6 +286,8 @@ public class ConditionRouter implements Router, Comparable<Router> {
                     sampleValue = sample.get(Constants.DEFAULT_KEY_PREFIX + key);
                 }
             }
+
+            // 匹配 value
             if (sampleValue != null) {
                 if (!matchPair.getValue().isMatch(sampleValue, param)) {
                     return false;
@@ -230,6 +307,7 @@ public class ConditionRouter implements Router, Comparable<Router> {
     }
 
     private static final class MatchPair {
+
         final Set<String> matches = new HashSet<String>();
         final Set<String> mismatches = new HashSet<String>();
 
@@ -253,7 +331,8 @@ public class ConditionRouter implements Router, Comparable<Router> {
             }
 
             if (!matches.isEmpty() && !mismatches.isEmpty()) {
-                //when both mismatches and matches contain the same value, then using mismatches first
+                //when both mismatches and matches contain the same value, then using mismatches
+                // first
                 for (String mismatch : mismatches) {
                     if (UrlUtils.isMatchGlobPattern(mismatch, value, param)) {
                         return false;

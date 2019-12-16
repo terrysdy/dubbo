@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.exchange.codec;
 
 import com.alibaba.dubbo.common.Version;
@@ -43,13 +44,11 @@ import java.io.InputStream;
 
 /**
  * ExchangeCodec.
- *
- *
- *
+ * dubbo 数据包编码反编码
  */
 public class ExchangeCodec extends TelnetCodec {
 
-    // header length.
+    // 消息头长度
     protected static final int HEADER_LENGTH = 16;
     // magic header.
     protected static final short MAGIC = (short) 0xdabb;
@@ -69,8 +68,10 @@ public class ExchangeCodec extends TelnetCodec {
     @Override
     public void encode(Channel channel, ChannelBuffer buffer, Object msg) throws IOException {
         if (msg instanceof Request) {
+            // 请求编码
             encodeRequest(channel, buffer, (Request) msg);
         } else if (msg instanceof Response) {
+            // 响应编码
             encodeResponse(channel, buffer, (Response) msg);
         } else {
             super.encode(channel, buffer, msg);
@@ -80,14 +81,17 @@ public class ExchangeCodec extends TelnetCodec {
     @Override
     public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
         int readable = buffer.readableBytes();
+        // 创建消息头字节数组，并读取消息头数据
         byte[] header = new byte[Math.min(readable, HEADER_LENGTH)];
         buffer.readBytes(header);
+
         return decode(channel, buffer, readable, header);
     }
 
     @Override
-    protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
-        // check magic number.
+    protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header)
+            throws IOException {
+        // 检查魔数是否相等
         if (readable > 0 && header[0] != MAGIC_HIGH
                 || readable > 1 && header[1] != MAGIC_LOW) {
             int length = header.length;
@@ -102,18 +106,22 @@ public class ExchangeCodec extends TelnetCodec {
                     break;
                 }
             }
+            // 通过 telnet 命令行发送的数据包不包含消息头，所以这里
+            // 调用 TelnetCodec 的 decode 方法对数据包进行解码
             return super.decode(channel, buffer, readable, header);
         }
-        // check length.
+        // 检测可读数据量是否少于消息头长度，若小于则立即返回 DecodeResult.NEED_MORE_INPUT
         if (readable < HEADER_LENGTH) {
             return DecodeResult.NEED_MORE_INPUT;
         }
 
-        // get data length.
+        // 获取消息体长度
         int len = Bytes.bytes2int(header, 12);
+        // 检查消息体长度是否超出限制
         checkPayload(channel, len);
 
         int tt = len + HEADER_LENGTH;
+        // 检测可读的字节数是否小于实际的字节数
         if (readable < tt) {
             return DecodeResult.NEED_MORE_INPUT;
         }
@@ -200,32 +208,51 @@ public class ExchangeCodec extends TelnetCodec {
 
     protected Object getRequestData(long id) {
         DefaultFuture future = DefaultFuture.getFuture(id);
-        if (future == null)
+        if (future == null) {
             return null;
+        }
         Request req = future.getRequest();
-        if (req == null)
+        if (req == null) {
             return null;
+        }
         return req.getData();
     }
 
-    protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req) throws IOException {
+    /**
+     * 1. 通过位运算将消息头写入到 header 数组中。
+     * 2. 对 Request 对象的 data 字段执行序列化操作，序列化后的数据最终会存储到 ChannelBuffer
+     * 3. 序列化操作执行完后，可得到数据序列化后的长度 len，紧接着将 len 写入到 header 指定位置处
+     * 4. 将消息头字节数组 header 写入到 ChannelBuffer
+     *
+     * @throws IOException
+     */
+    protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req)
+            throws IOException {
         Serialization serialization = getSerialization(channel);
-        // header.
+        // 消息头
         byte[] header = new byte[HEADER_LENGTH];
-        // set magic number.
+        // 设置魔数
         Bytes.short2bytes(MAGIC, header);
 
-        // set request and serialization flag.
+        // 设置数据包类型为 request
+        // 序列化器编号
         header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());
 
-        if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
-        if (req.isEvent()) header[2] |= FLAG_EVENT;
+        // 通信方式（单向/双向）
+        if (req.isTwoWay()) {
+            header[2] |= FLAG_TWOWAY;
+        }
+        // 事件标识
+        if (req.isEvent()) {
+            header[2] |= FLAG_EVENT;
+        }
 
-        // set request id.
+        // requestId
         Bytes.long2bytes(req.getId(), header, 4);
 
-        // encode request data.
+        // 获取 buffer 当前写 index
         int savedWriteIndex = buffer.writerIndex();
+        // 更新 writeIndex，准备写消息内容
         buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);
         ChannelBufferOutputStream bos = new ChannelBufferOutputStream(buffer);
         ObjectOutput out = serialization.serialize(channel.getUrl(), bos);
@@ -242,25 +269,29 @@ public class ExchangeCodec extends TelnetCodec {
         bos.close();
         int len = bos.writtenBytes();
         checkPayload(channel, len);
+        // 消息体长度
         Bytes.int2bytes(len, header, 12);
 
-        // write
+        // 写入消息头字节，更新 writeIndex
         buffer.writerIndex(savedWriteIndex);
         buffer.writeBytes(header); // write header.
         buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);
     }
 
-    protected void encodeResponse(Channel channel, ChannelBuffer buffer, Response res) throws IOException {
+    protected void encodeResponse(Channel channel, ChannelBuffer buffer, Response res)
+            throws IOException {
         int savedWriteIndex = buffer.writerIndex();
         try {
             Serialization serialization = getSerialization(channel);
-            // header.
+            // 消息头
             byte[] header = new byte[HEADER_LENGTH];
-            // set magic number.
+            // 魔数
             Bytes.short2bytes(MAGIC, header);
             // set request and serialization flag.
             header[2] = serialization.getContentTypeId();
-            if (res.isHeartbeat()) header[2] |= FLAG_EVENT;
+            if (res.isHeartbeat()) {
+                header[2] |= FLAG_EVENT;
+            }
             // set response status.
             byte status = res.getStatus();
             header[3] = status;
@@ -277,7 +308,9 @@ public class ExchangeCodec extends TelnetCodec {
                 } else {
                     encodeResponseData(channel, out, res.getResult(), res.getVersion());
                 }
-            } else out.writeUTF(res.getErrorMessage());
+            } else {
+                out.writeUTF(res.getErrorMessage());
+            }
             out.flushBuffer();
             if (out instanceof Cleanable) {
                 ((Cleanable) out).cleanup();
@@ -307,17 +340,29 @@ public class ExchangeCodec extends TelnetCodec {
                         channel.send(r);
                         return;
                     } catch (RemotingException e) {
-                        logger.warn("Failed to send bad_response info back: " + t.getMessage() + ", cause: " + e.getMessage(), e);
+                        logger.warn("Failed to send bad_response info back: "
+                                + t.getMessage()
+                                + ", cause: "
+                                + e.getMessage(), e);
                     }
                 } else {
                     // FIXME log error message in Codec and handle in caught() of IoHanndler?
-                    logger.warn("Fail to encode response: " + res + ", send bad_response info instead, cause: " + t.getMessage(), t);
+                    logger.warn("Fail to encode response: "
+                            + res
+                            + ", send bad_response info instead, cause: "
+                            + t.getMessage(), t);
                     try {
-                        r.setErrorMessage("Failed to send response: " + res + ", cause: " + StringUtils.toString(t));
+                        r.setErrorMessage("Failed to send response: "
+                                + res
+                                + ", cause: "
+                                + StringUtils.toString(t));
                         channel.send(r);
                         return;
                     } catch (RemotingException e) {
-                        logger.warn("Failed to send bad_response info back: " + res + ", cause: " + e.getMessage(), e);
+                        logger.warn("Failed to send bad_response info back: "
+                                + res
+                                + ", cause: "
+                                + e.getMessage(), e);
                     }
                 }
             }
@@ -417,7 +462,8 @@ public class ExchangeCodec extends TelnetCodec {
         return decodeResponseData(in);
     }
 
-    protected Object decodeResponseData(Channel channel, ObjectInput in, Object requestData) throws IOException {
+    protected Object decodeResponseData(Channel channel, ObjectInput in, Object requestData)
+            throws IOException {
         return decodeResponseData(channel, in);
     }
 
@@ -426,30 +472,34 @@ public class ExchangeCodec extends TelnetCodec {
         encodeRequestData(channel, out, data);
     }
 
-    private void encodeEventData(Channel channel, ObjectOutput out, Object data) throws IOException {
+    private void encodeEventData(Channel channel, ObjectOutput out, Object data)
+            throws IOException {
         encodeEventData(out, data);
     }
 
     @Deprecated
-    protected void encodeHeartbeatData(Channel channel, ObjectOutput out, Object data) throws IOException {
+    protected void encodeHeartbeatData(Channel channel, ObjectOutput out, Object data)
+            throws IOException {
         encodeHeartbeatData(out, data);
     }
 
-    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data) throws IOException {
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data)
+            throws IOException {
         encodeRequestData(out, data);
     }
 
-    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data) throws IOException {
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data)
+            throws IOException {
         encodeResponseData(out, data);
     }
 
-    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+    protected void encodeRequestData(Channel channel, ObjectOutput out, Object data, String version)
+            throws IOException {
         encodeRequestData(out, data);
     }
 
-    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data, String version) throws IOException {
+    protected void encodeResponseData(Channel channel, ObjectOutput out, Object data,
+            String version) throws IOException {
         encodeResponseData(out, data);
     }
-
-
 }

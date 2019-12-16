@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.protocol.dubbo;
 
 import com.alibaba.dubbo.common.Constants;
@@ -44,6 +45,7 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
 
     private final ExchangeClient[] clients;
 
+    // 调用编号
     private final AtomicPositiveInteger index = new AtomicPositiveInteger();
 
     private final String version;
@@ -56,8 +58,11 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
         this(serviceType, url, clients, null);
     }
 
-    public DubboInvoker(Class<T> serviceType, URL url, ExchangeClient[] clients, Set<Invoker<?>> invokers) {
-        super(serviceType, url, new String[]{Constants.INTERFACE_KEY, Constants.GROUP_KEY, Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});
+    public DubboInvoker(Class<T> serviceType, URL url, ExchangeClient[] clients,
+            Set<Invoker<?>> invokers) {
+        super(serviceType, url,
+                new String[] { Constants.INTERFACE_KEY, Constants.GROUP_KEY, Constants.TOKEN_KEY,
+                        Constants.TIMEOUT_KEY });
         this.clients = clients;
         // get version.
         this.version = url.getParameter(Constants.VERSION_KEY, "0.0.0");
@@ -68,45 +73,67 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
     protected Result doInvoke(final Invocation invocation) throws Throwable {
         RpcInvocation inv = (RpcInvocation) invocation;
         final String methodName = RpcUtils.getMethodName(invocation);
+        // 设置 path、version
         inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());
         inv.setAttachment(Constants.VERSION_KEY, version);
 
+        // 选择 exchangeClient
         ExchangeClient currentClient;
         if (clients.length == 1) {
             currentClient = clients[0];
         } else {
             currentClient = clients[index.getAndIncrement() % clients.length];
         }
+
         try {
             boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
+            // 单向通信，无返回值
             boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
-            int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+            int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY,
+                    Constants.DEFAULT_TIMEOUT);
             if (isOneway) {
                 boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
                 currentClient.send(inv, isSent);
                 RpcContext.getContext().setFuture(null);
                 return new RpcResult();
             } else if (isAsync) {
+                // 异步调用有返回值
+                // 将 future 设置到 context 中
                 ResponseFuture future = currentClient.request(inv, timeout);
                 RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));
                 return new RpcResult();
             } else {
                 RpcContext.getContext().setFuture(null);
+                // 同步调用
                 return (Result) currentClient.request(inv, timeout).get();
             }
         } catch (TimeoutException e) {
-            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Invoke remote method timeout. method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+            throw new RpcException(RpcException.TIMEOUT_EXCEPTION,
+                    "Invoke remote method timeout. method: "
+                            + invocation.getMethodName()
+                            + ", provider: "
+                            + getUrl()
+                            + ", cause: "
+                            + e.getMessage(), e);
         } catch (RemotingException e) {
-            throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+            throw new RpcException(RpcException.NETWORK_EXCEPTION,
+                    "Failed to invoke remote method: "
+                            + invocation.getMethodName()
+                            + ", provider: "
+                            + getUrl()
+                            + ", cause: "
+                            + e.getMessage(), e);
         }
     }
 
     @Override
     public boolean isAvailable() {
-        if (!super.isAvailable())
+        if (!super.isAvailable()) {
             return false;
+        }
         for (ExchangeClient client : clients) {
-            if (client.isConnected() && !client.hasAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY)) {
+            if (client.isConnected() && !client.hasAttribute(
+                    Constants.CHANNEL_ATTRIBUTE_READONLY_KEY)) {
                 //cannot write == not Available ?
                 return true;
             }
@@ -116,8 +143,10 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
 
     @Override
     public void destroy() {
-        // in order to avoid closing a client multiple times, a counter is used in case of connection per jvm, every
-        // time when client.close() is called, counter counts down once, and when counter reaches zero, client will be
+        // in order to avoid closing a client multiple times, a counter is used in case of
+        // connection per jvm, every
+        // time when client.close() is called, counter counts down once, and when counter reaches
+        // zero, client will be
         // closed.
         if (super.isDestroyed()) {
             return;
@@ -139,7 +168,6 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
                         logger.warn(t.getMessage(), t);
                     }
                 }
-
             } finally {
                 destroyLock.unlock();
             }

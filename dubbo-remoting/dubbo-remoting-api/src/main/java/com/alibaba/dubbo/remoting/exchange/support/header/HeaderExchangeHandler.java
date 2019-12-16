@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.exchange.support.header;
 
 import com.alibaba.dubbo.common.Constants;
@@ -77,23 +78,30 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
 
     Response handleRequest(ExchangeChannel channel, Request req) throws RemotingException {
         Response res = new Response(req.getId(), req.getVersion());
+        // 请求不合法，响应 BAD_REQUEST
         if (req.isBroken()) {
             Object data = req.getData();
 
             String msg;
-            if (data == null) msg = null;
-            else if (data instanceof Throwable) msg = StringUtils.toString((Throwable) data);
-            else msg = data.toString();
+            if (data == null) {
+                msg = null;
+            } else if (data instanceof Throwable) {
+                msg = StringUtils.toString((Throwable) data);
+            } else {
+                msg = data.toString();
+            }
             res.setErrorMessage("Fail to decode request due to: " + msg);
             res.setStatus(Response.BAD_REQUEST);
 
             return res;
         }
-        // find handler by message class.
+
+        // 获取 data，即 RpcInvocation
         Object msg = req.getData();
         try {
-            // handle data.
+            // 交给下个 handler
             Object result = handler.reply(channel, msg);
+            // 设置结果
             res.setStatus(Response.OK);
             res.setResult(result);
         } catch (Throwable e) {
@@ -163,16 +171,19 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);
         try {
+            // 处理请求
             if (message instanceof Request) {
-                // handle request.
                 Request request = (Request) message;
                 if (request.isEvent()) {
+                    // 事件
                     handlerEvent(channel, request);
                 } else {
                     if (request.isTwoWay()) {
+                        // 双向通信，响应 response
                         Response response = handleRequest(exchangeChannel, request);
                         channel.send(response);
                     } else {
+                        // 单向通信，交给后续 handler
                         handler.received(exchangeChannel, request.getData());
                     }
                 }
@@ -180,7 +191,12 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
                 handleResponse(channel, (Response) message);
             } else if (message instanceof String) {
                 if (isClientSide(channel)) {
-                    Exception e = new Exception("Dubbo client can not supported string message: " + message + " in channel: " + channel + ", url: " + channel.getUrl());
+                    Exception e = new Exception("Dubbo client can not supported string message: "
+                            + message
+                            + " in channel: "
+                            + channel
+                            + ", url: "
+                            + channel.getUrl());
                     logger.error(e.getMessage(), e);
                 } else {
                     String echo = handler.telnet(channel, (String) message);

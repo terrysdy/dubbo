@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.exchange.support.header;
 
 import com.alibaba.dubbo.common.Constants;
@@ -39,12 +40,14 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * DefaultMessageClient
+ * 封装心态相关逻辑，默认 ExchangeClient
  */
 public class HeaderExchangeClient implements ExchangeClient {
 
     private static final Logger logger = LoggerFactory.getLogger(HeaderExchangeClient.class);
 
-    private static final ScheduledThreadPoolExecutor scheduled = new ScheduledThreadPoolExecutor(2, new NamedThreadFactory("dubbo-remoting-client-heartbeat", true));
+    private static final ScheduledThreadPoolExecutor scheduled = new ScheduledThreadPoolExecutor(2,
+            new NamedThreadFactory("dubbo-remoting-client-heartbeat", true));
     private final Client client;
     private final ExchangeChannel channel;
     // heartbeat timer
@@ -58,14 +61,21 @@ public class HeaderExchangeClient implements ExchangeClient {
             throw new IllegalArgumentException("client == null");
         }
         this.client = client;
+        // 创建 channel
         this.channel = new HeaderExchangeChannel(client);
         String dubbo = client.getUrl().getParameter(Constants.DUBBO_VERSION_KEY);
-        this.heartbeat = client.getUrl().getParameter(Constants.HEARTBEAT_KEY, dubbo != null && dubbo.startsWith("1.0.") ? Constants.DEFAULT_HEARTBEAT : 0);
-        this.heartbeatTimeout = client.getUrl().getParameter(Constants.HEARTBEAT_TIMEOUT_KEY, heartbeat * 3);
+        // 心跳参数设置
+        this.heartbeat = client.getUrl()
+                .getParameter(Constants.HEARTBEAT_KEY,
+                        dubbo != null && dubbo.startsWith("1.0.") ? Constants.DEFAULT_HEARTBEAT
+                                : 0);
+        this.heartbeatTimeout = client.getUrl()
+                .getParameter(Constants.HEARTBEAT_TIMEOUT_KEY, heartbeat * 3);
         if (heartbeatTimeout < heartbeat * 2) {
             throw new IllegalStateException("heartbeatTimeout < heartbeatInterval * 2");
         }
         if (needHeartbeat) {
+            // 开启心跳定时器
             startHeartbeatTimer();
         }
     }
@@ -127,7 +137,9 @@ public class HeaderExchangeClient implements ExchangeClient {
 
     @Override
     public void close() {
+        // 关闭心跳定时器
         doClose();
+        // 关闭 channel
         channel.close();
     }
 
@@ -209,6 +221,7 @@ public class HeaderExchangeClient implements ExchangeClient {
     }
 
     private void doClose() {
+        // 关闭心跳定时器
         stopHeartbeatTimer();
     }
 

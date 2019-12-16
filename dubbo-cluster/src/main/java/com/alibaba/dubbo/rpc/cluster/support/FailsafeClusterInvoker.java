@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support;
 
 import com.alibaba.dubbo.common.logger.Logger;
@@ -31,11 +32,12 @@ import java.util.List;
 /**
  * When invoke fails, log the error message and ignore this error by returning an empty RpcResult.
  * Usually used to write audit logs and other operations
- *
+ * <p>
+ * 调用异常，仅打印日志，不抛异常。适用于写入审计日志等场景
  * <a href="http://en.wikipedia.org/wiki/Fail-safe">Fail-safe</a>
- *
  */
 public class FailsafeClusterInvoker<T> extends AbstractClusterInvoker<T> {
+
     private static final Logger logger = LoggerFactory.getLogger(FailsafeClusterInvoker.class);
 
     public FailsafeClusterInvoker(Directory<T> directory) {
@@ -43,7 +45,8 @@ public class FailsafeClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     @Override
-    public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    public Result doInvoke(Invocation invocation, List<Invoker<T>> invokers,
+            LoadBalance loadbalance) throws RpcException {
         try {
             checkInvokers(invokers, invocation);
             Invoker<T> invoker = select(loadbalance, invocation, invokers, null);

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.transport.netty;
 
 import com.alibaba.dubbo.common.Constants;
@@ -58,15 +59,23 @@ public class NettyServer extends AbstractServer implements Server {
     private org.jboss.netty.channel.Channel channel;
 
     public NettyServer(URL url, ChannelHandler handler) throws RemotingException {
-        super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
+        super(url, ChannelHandlers.wrap(handler,
+                ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
     }
 
     @Override
     protected void doOpen() throws Throwable {
         NettyHelper.setNettyLoggerFactory();
-        ExecutorService boss = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerBoss", true));
-        ExecutorService worker = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerWorker", true));
-        ChannelFactory channelFactory = new NioServerSocketChannelFactory(boss, worker, getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS));
+        // 创建 boss、worker 线程池
+        ExecutorService boss = Executors.newCachedThreadPool(
+                new NamedThreadFactory("NettyServerBoss", true));
+        ExecutorService worker = Executors.newCachedThreadPool(
+                new NamedThreadFactory("NettyServerWorker", true));
+        ChannelFactory channelFactory = new NioServerSocketChannelFactory(boss, worker,
+                getUrl().getPositiveParameter(Constants.IO_THREADS_KEY,
+                        Constants.DEFAULT_IO_THREADS));
+
+        // 创建 ServerBootstrap
         bootstrap = new ServerBootstrap(channelFactory);
 
         final NettyHandler nettyHandler = new NettyHandler(getUrl(), this);
@@ -75,14 +84,17 @@ public class NettyServer extends AbstractServer implements Server {
         // https://issues.jboss.org/browse/NETTY-379
         // final Timer timer = new HashedWheelTimer(new NamedThreadFactory("NettyIdleTimer", true));
         bootstrap.setOption("child.tcpNoDelay", true);
+        // 设置 PipelineFactory
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
             @Override
             public ChannelPipeline getPipeline() {
-                NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(), NettyServer.this);
+                NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(),
+                        NettyServer.this);
                 ChannelPipeline pipeline = Channels.pipeline();
                 /*int idleTimeout = getIdleTimeout();
                 if (idleTimeout > 10000) {
-                    pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0, 0));
+                    pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0,
+                    0));
                 }*/
                 pipeline.addLast("decoder", adapter.getDecoder());
                 pipeline.addLast("encoder", adapter.getEncoder());
@@ -90,7 +102,7 @@ public class NettyServer extends AbstractServer implements Server {
                 return pipeline;
             }
         });
-        // bind
+        // 绑定到指定的 ip 和端口上
         channel = bootstrap.bind(getBindAddress());
     }
 
@@ -157,5 +169,4 @@ public class NettyServer extends AbstractServer implements Server {
     public boolean isBound() {
         return channel.isBound();
     }
-
 }

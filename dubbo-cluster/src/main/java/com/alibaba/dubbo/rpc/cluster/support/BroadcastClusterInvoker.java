@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support;
 
 import com.alibaba.dubbo.common.logger.Logger;
@@ -30,7 +31,8 @@ import java.util.List;
 
 /**
  * BroadcastClusterInvoker
- *
+ * <p>
+ * 遍历调用所有 invoker，适用于通知更新缓存等本地资源信息场景
  */
 public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -41,8 +43,9 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Result doInvoke(final Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    @SuppressWarnings( { "unchecked", "rawtypes" })
+    public Result doInvoke(final Invocation invocation, List<Invoker<T>> invokers,
+            LoadBalance loadbalance) throws RpcException {
         checkInvokers(invokers, invocation);
         RpcContext.getContext().setInvokers((List) invokers);
         RpcException exception = null;
@@ -63,5 +66,4 @@ public class BroadcastClusterInvoker<T> extends AbstractClusterInvoker<T> {
         }
         return result;
     }
-
 }

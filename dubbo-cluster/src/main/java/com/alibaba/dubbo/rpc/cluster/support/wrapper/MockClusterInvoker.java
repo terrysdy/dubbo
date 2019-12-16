@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support.wrapper;
 
 import com.alibaba.dubbo.common.Constants;
@@ -32,6 +33,9 @@ import com.alibaba.dubbo.rpc.support.MockInvoker;
 
 import java.util.List;
 
+/**
+ * 包含服务降级 mock 逻辑
+ */
 public class MockClusterInvoker<T> implements Invoker<T> {
 
     private static final Logger logger = LoggerFactory.getLogger(MockClusterInvoker.class);
@@ -69,18 +73,25 @@ public class MockClusterInvoker<T> implements Invoker<T> {
     public Result invoke(Invocation invocation) throws RpcException {
         Result result = null;
 
-        String value = directory.getUrl().getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY, Boolean.FALSE.toString()).trim();
+        // 配置的 mock 值
+        String value = directory.getUrl()
+                .getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY,
+                        Boolean.FALSE.toString())
+                .trim();
         if (value.length() == 0 || value.equalsIgnoreCase("false")) {
-            //no mock
+            // 没有 mock，调用 Invoker
             result = this.invoker.invoke(invocation);
         } else if (value.startsWith("force")) {
             if (logger.isWarnEnabled()) {
-                logger.info("force-mock: " + invocation.getMethodName() + " force-mock enabled , url : " + directory.getUrl());
+                logger.info("force-mock: "
+                        + invocation.getMethodName()
+                        + " force-mock enabled , url : "
+                        + directory.getUrl());
             }
-            //force:direct mock
+            // force:xxx 直接走 mock 逻辑
             result = doMockInvoke(invocation, null);
         } else {
-            //fail-mock
+            // fail:xxx 服务调用失败后走 mock 逻辑
             try {
                 result = this.invoker.invoke(invocation);
             } catch (RpcException e) {
@@ -88,7 +99,10 @@ public class MockClusterInvoker<T> implements Invoker<T> {
                     throw e;
                 } else {
                     if (logger.isWarnEnabled()) {
-                        logger.warn("fail-mock: " + invocation.getMethodName() + " fail-mock enabled , url : " + directory.getUrl(), e);
+                        logger.warn("fail-mock: "
+                                + invocation.getMethodName()
+                                + " fail-mock enabled , url : "
+                                + directory.getUrl(), e);
                     }
                     result = doMockInvoke(invocation, e);
                 }
@@ -97,7 +111,7 @@ public class MockClusterInvoker<T> implements Invoker<T> {
         return result;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings( { "unchecked", "rawtypes" })
     private Result doMockInvoke(Invocation invocation, RpcException e) {
         Result result = null;
         Invoker<T> minvoker;
@@ -133,26 +147,32 @@ public class MockClusterInvoker<T> implements Invoker<T> {
     /**
      * Return MockInvoker
      * Contract：
-     * directory.list() will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK is present in invocation, otherwise, a list of mock invokers will return.
+     * directory.list() will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK is
+     * present in invocation, otherwise, a list of mock invokers will return.
      * if directory.list() returns more than one mock invoker, only one of them will be used.
-     *
-     * @param invocation
-     * @return
      */
     private List<Invoker<T>> selectMockInvoker(Invocation invocation) {
         List<Invoker<T>> invokers = null;
         //TODO generic invoker？
         if (invocation instanceof RpcInvocation) {
-            //Note the implicit contract (although the description is added to the interface declaration, but extensibility is a problem. The practice placed in the attachement needs to be improved)
-            ((RpcInvocation) invocation).setAttachment(Constants.INVOCATION_NEED_MOCK, Boolean.TRUE.toString());
-            //directory will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK is present in invocation, otherwise, a list of mock invokers will return.
+            //Note the implicit contract (although the description is added to the interface
+            // declaration, but extensibility is a problem. The practice placed in the
+            // attachement needs to be improved)
+            ((RpcInvocation) invocation).setAttachment(Constants.INVOCATION_NEED_MOCK,
+                    Boolean.TRUE.toString());
+            //directory will return a list of normal invokers if Constants.INVOCATION_NEED_MOCK
+            // is present in invocation, otherwise, a list of mock invokers will return.
             try {
                 invokers = directory.list(invocation);
             } catch (RpcException e) {
                 if (logger.isInfoEnabled()) {
-                    logger.info("Exception when try to invoke mock. Get mock invokers error for service:"
-                            + directory.getUrl().getServiceInterface() + ", method:" + invocation.getMethodName()
-                            + ", will contruct a new mock with 'new MockInvoker()'.", e);
+                    logger.info(
+                            "Exception when try to invoke mock. Get mock invokers error for "
+                                    + "service:"
+                                    + directory.getUrl().getServiceInterface()
+                                    + ", method:"
+                                    + invocation.getMethodName()
+                                    + ", will contruct a new mock with 'new MockInvoker()'.", e);
                 }
             }
         }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.directory;
 
 import com.alibaba.dubbo.common.Constants;
@@ -34,8 +35,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Abstract implementation of Directory: Invoker list returned from this Directory's list method have been filtered by Routers
- *
+ * Abstract implementation of Directory: Invoker list returned from this Directory's list method
+ * have been filtered by Routers
  */
 public abstract class AbstractDirectory<T> implements Directory<T> {
 
@@ -59,8 +60,9 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
     }
 
     public AbstractDirectory(URL url, URL consumerUrl, List<Router> routers) {
-        if (url == null)
+        if (url == null) {
             throw new IllegalArgumentException("url == null");
+        }
         this.url = url;
         this.consumerUrl = consumerUrl;
         setRouters(routers);
@@ -71,16 +73,22 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         if (destroyed) {
             throw new RpcException("Directory already destroyed .url: " + getUrl());
         }
+
         List<Invoker<T>> invokers = doList(invocation);
+
         List<Router> localRouters = this.routers; // local reference
         if (localRouters != null && !localRouters.isEmpty()) {
             for (Router router : localRouters) {
                 try {
-                    if (router.getUrl() == null || router.getUrl().getParameter(Constants.RUNTIME_KEY, false)) {
+                    if (router.getUrl() == null || router.getUrl()
+                            .getParameter(Constants.RUNTIME_KEY, false)) {
+                        // 服务路由
                         invokers = router.route(invokers, getConsumerUrl(), invocation);
                     }
                 } catch (Throwable t) {
-                    logger.error("Failed to execute router: " + getUrl() + ", cause: " + t.getMessage(), t);
+                    logger.error(
+                            "Failed to execute router: " + getUrl() + ", cause: " + t.getMessage(),
+                            t);
                 }
             }
         }
@@ -102,7 +110,8 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
         // append url router
         String routerkey = url.getParameter(Constants.ROUTER_KEY);
         if (routerkey != null && routerkey.length() > 0) {
-            RouterFactory routerFactory = ExtensionLoader.getExtensionLoader(RouterFactory.class).getExtension(routerkey);
+            RouterFactory routerFactory = ExtensionLoader.getExtensionLoader(RouterFactory.class)
+                    .getExtension(routerkey);
             routers.add(routerFactory.getRouter(url));
         }
         // append mock invoker selector
@@ -129,5 +138,4 @@ public abstract class AbstractDirectory<T> implements Directory<T> {
     }
 
     protected abstract List<Invoker<T>> doList(Invocation invocation) throws RpcException;
-
 }

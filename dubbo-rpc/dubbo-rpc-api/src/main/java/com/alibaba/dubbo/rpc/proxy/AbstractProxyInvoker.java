@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.proxy;
 
 import com.alibaba.dubbo.common.URL;
@@ -44,7 +45,8 @@ public abstract class AbstractProxyInvoker<T> implements Invoker<T> {
             throw new IllegalArgumentException("interface == null");
         }
         if (!type.isInstance(proxy)) {
-            throw new IllegalArgumentException(proxy.getClass().getName() + " not implement interface " + type);
+            throw new IllegalArgumentException(
+                    proxy.getClass().getName() + " not implement interface " + type);
         }
         this.proxy = proxy;
         this.type = type;
@@ -73,20 +75,27 @@ public abstract class AbstractProxyInvoker<T> implements Invoker<T> {
     @Override
     public Result invoke(Invocation invocation) throws RpcException {
         try {
-            return new RpcResult(doInvoke(proxy, invocation.getMethodName(), invocation.getParameterTypes(), invocation.getArguments()));
+            // 响应封装为 RpcResult
+            return new RpcResult(
+                    doInvoke(proxy, invocation.getMethodName(), invocation.getParameterTypes(),
+                            invocation.getArguments()));
         } catch (InvocationTargetException e) {
             return new RpcResult(e.getTargetException());
         } catch (Throwable e) {
-            throw new RpcException("Failed to invoke remote proxy method " + invocation.getMethodName() + " to " + getUrl() + ", cause: " + e.getMessage(), e);
+            throw new RpcException("Failed to invoke remote proxy method "
+                    + invocation.getMethodName()
+                    + " to "
+                    + getUrl()
+                    + ", cause: "
+                    + e.getMessage(), e);
         }
     }
 
-    protected abstract Object doInvoke(T proxy, String methodName, Class<?>[] parameterTypes, Object[] arguments) throws Throwable;
+    protected abstract Object doInvoke(T proxy, String methodName, Class<?>[] parameterTypes,
+            Object[] arguments) throws Throwable;
 
     @Override
     public String toString() {
         return getInterface() + " -> " + (getUrl() == null ? " " : getUrl().toString());
     }
-
-
 }

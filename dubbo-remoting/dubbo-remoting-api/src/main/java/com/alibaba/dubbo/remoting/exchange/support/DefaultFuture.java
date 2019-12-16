@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.exchange.support;
 
 import com.alibaba.dubbo.common.Constants;
@@ -45,10 +46,13 @@ public class DefaultFuture implements ResponseFuture {
 
     private static final Map<Long, Channel> CHANNELS = new ConcurrentHashMap<Long, Channel>();
 
-    private static final Map<Long, DefaultFuture> FUTURES = new ConcurrentHashMap<Long, DefaultFuture>();
+    // Map<requestId,Future>
+    private static final Map<Long, DefaultFuture> FUTURES = new ConcurrentHashMap<Long,
+            DefaultFuture>();
 
     static {
-        Thread th = new Thread(new RemotingInvocationTimeoutScan(), "DubboResponseTimeoutScanTimer");
+        Thread th = new Thread(new RemotingInvocationTimeoutScan(),
+                "DubboResponseTimeoutScanTimer");
         th.setDaemon(true);
         th.start();
     }
@@ -68,8 +72,10 @@ public class DefaultFuture implements ResponseFuture {
     public DefaultFuture(Channel channel, Request request, int timeout) {
         this.channel = channel;
         this.request = request;
+        // requestId
         this.id = request.getId();
-        this.timeout = timeout > 0 ? timeout : channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+        this.timeout = timeout > 0 ? timeout : channel.getUrl()
+                .getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
         // put into waiting map.
         FUTURES.put(id, this);
         CHANNELS.put(id, channel);
@@ -115,8 +121,10 @@ public class DefaultFuture implements ResponseFuture {
 
     public static void received(Channel channel, Response response) {
         try {
+            // 根据 requestId 获取 future
             DefaultFuture future = FUTURES.remove(response.getId());
             if (future != null) {
+                // 唤醒用户线程
                 future.doReceived(response);
             } else {
                 logger.warn("The timeout response finally returned at "
@@ -140,12 +148,15 @@ public class DefaultFuture implements ResponseFuture {
         if (timeout <= 0) {
             timeout = Constants.DEFAULT_TIMEOUT;
         }
+
         if (!isDone()) {
             long start = System.currentTimeMillis();
             lock.lock();
             try {
                 while (!isDone()) {
+                    // 无调用结果，等待，直到有调用结果了，signal 唤醒
                     done.await(timeout, TimeUnit.MILLISECONDS);
+                    // 调用有结果或等待超时
                     if (isDone() || System.currentTimeMillis() - start > timeout) {
                         break;
                     }
@@ -156,9 +167,11 @@ public class DefaultFuture implements ResponseFuture {
                 lock.unlock();
             }
             if (!isDone()) {
+                // 超时
                 throw new TimeoutException(sent > 0, channel, getTimeoutMessage(false));
             }
         }
+        // 返回调用结果
         return returnFromResponse();
     }
 
@@ -212,11 +225,16 @@ public class DefaultFuture implements ResponseFuture {
             try {
                 callbackCopy.done(res.getResult());
             } catch (Exception e) {
-                logger.error("callback invoke error .reasult:" + res.getResult() + ",url:" + channel.getUrl(), e);
+                logger.error("callback invoke error .reasult:"
+                        + res.getResult()
+                        + ",url:"
+                        + channel.getUrl(), e);
             }
-        } else if (res.getStatus() == Response.CLIENT_TIMEOUT || res.getStatus() == Response.SERVER_TIMEOUT) {
+        } else if (res.getStatus() == Response.CLIENT_TIMEOUT
+                || res.getStatus() == Response.SERVER_TIMEOUT) {
             try {
-                TimeoutException te = new TimeoutException(res.getStatus() == Response.SERVER_TIMEOUT, channel, res.getErrorMessage());
+                TimeoutException te = new TimeoutException(
+                        res.getStatus() == Response.SERVER_TIMEOUT, channel, res.getErrorMessage());
                 callbackCopy.caught(te);
             } catch (Exception e) {
                 logger.error("callback invoke error ,url:" + channel.getUrl(), e);
@@ -236,11 +254,15 @@ public class DefaultFuture implements ResponseFuture {
         if (res == null) {
             throw new IllegalStateException("response cannot be null");
         }
+        // 正常响应
         if (res.getStatus() == Response.OK) {
             return res.getResult();
         }
-        if (res.getStatus() == Response.CLIENT_TIMEOUT || res.getStatus() == Response.SERVER_TIMEOUT) {
-            throw new TimeoutException(res.getStatus() == Response.SERVER_TIMEOUT, channel, res.getErrorMessage());
+        // 超时
+        if (res.getStatus() == Response.CLIENT_TIMEOUT
+                || res.getStatus() == Response.SERVER_TIMEOUT) {
+            throw new TimeoutException(res.getStatus() == Response.SERVER_TIMEOUT, channel,
+                    res.getErrorMessage());
         }
         throw new RemotingException(channel, res.getErrorMessage());
     }
@@ -278,6 +300,7 @@ public class DefaultFuture implements ResponseFuture {
         try {
             response = res;
             if (done != null) {
+                // 唤醒用户线程
                 done.signal();
             }
         } finally {
@@ -290,15 +313,25 @@ public class DefaultFuture implements ResponseFuture {
 
     private String getTimeoutMessage(boolean scan) {
         long nowTimestamp = System.currentTimeMillis();
-        return (sent > 0 ? "Waiting server-side response timeout" : "Sending request timeout in client-side")
-                + (scan ? " by scan timer" : "") + ". start time: "
-                + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date(start))) + ", end time: "
-                + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date())) + ","
+        return (sent > 0 ? "Waiting server-side response timeout"
+                : "Sending request timeout in client-side")
+                + (scan ? " by scan timer" : "")
+                + ". start time: "
+                + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date(start)))
+                + ", end time: "
+                + (new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+                + ","
                 + (sent > 0 ? " client elapsed: " + (sent - start)
                 + " ms, server elapsed: " + (nowTimestamp - sent)
-                : " elapsed: " + (nowTimestamp - start)) + " ms, timeout: "
-                + timeout + " ms, request: " + request + ", channel: " + channel.getLocalAddress()
-                + " -> " + channel.getRemoteAddress();
+                : " elapsed: " + (nowTimestamp - start))
+                + " ms, timeout: "
+                + timeout
+                + " ms, request: "
+                + request
+                + ", channel: "
+                + channel.getLocalAddress()
+                + " -> "
+                + channel.getRemoteAddress();
     }
 
     private static class RemotingInvocationTimeoutScan implements Runnable {
@@ -311,11 +344,13 @@ public class DefaultFuture implements ResponseFuture {
                         if (future == null || future.isDone()) {
                             continue;
                         }
-                        if (System.currentTimeMillis() - future.getStartTimestamp() > future.getTimeout()) {
+                        if (System.currentTimeMillis() - future.getStartTimestamp()
+                                > future.getTimeout()) {
                             // create exception response.
                             Response timeoutResponse = new Response(future.getId());
                             // set timeout status.
-                            timeoutResponse.setStatus(future.isSent() ? Response.SERVER_TIMEOUT : Response.CLIENT_TIMEOUT);
+                            timeoutResponse.setStatus(future.isSent() ? Response.SERVER_TIMEOUT
+                                    : Response.CLIENT_TIMEOUT);
                             timeoutResponse.setErrorMessage(future.getTimeoutMessage(true));
                             // handle response.
                             DefaultFuture.received(future.getChannel(), timeoutResponse);
@@ -328,5 +363,4 @@ public class DefaultFuture implements ResponseFuture {
             }
         }
     }
-
 }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.config.spring;
 
 import com.alibaba.dubbo.config.ApplicationConfig;
@@ -46,7 +47,9 @@ import java.util.Map;
  *
  * @export
  */
-public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean, DisposableBean, ApplicationContextAware, ApplicationListener<ContextRefreshedEvent>, BeanNameAware {
+public class ServiceBean<T> extends ServiceConfig<T>
+        implements InitializingBean, DisposableBean, ApplicationContextAware,
+        ApplicationListener<ContextRefreshedEvent>, BeanNameAware {
 
     private static final long serialVersionUID = 213195494150089726L;
 
@@ -58,6 +61,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     private transient String beanName;
 
+    // 当前的 Spring 容器是否支持 ApplicationListener
     private transient boolean supportedApplicationListener;
 
     public ServiceBean() {
@@ -81,17 +85,23 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         if (applicationContext != null) {
             SPRING_CONTEXT = applicationContext;
             try {
-                Method method = applicationContext.getClass().getMethod("addApplicationListener", new Class<?>[]{ApplicationListener.class}); // backward compatibility to spring 2.0.1
-                method.invoke(applicationContext, new Object[]{this});
+                Method method = applicationContext.getClass()
+                        .getMethod("addApplicationListener", new Class<?>[] {
+                                ApplicationListener.class }); // backward compatibility to spring
+                // 2.0.1
+                method.invoke(applicationContext, new Object[] { this });
                 supportedApplicationListener = true;
             } catch (Throwable t) {
                 if (applicationContext instanceof AbstractApplicationContext) {
                     try {
-                        Method method = AbstractApplicationContext.class.getDeclaredMethod("addListener", new Class<?>[]{ApplicationListener.class}); // backward compatibility to spring 2.0.1
+                        Method method = AbstractApplicationContext.class.getDeclaredMethod(
+                                "addListener", new Class<?>[] {
+                                        ApplicationListener.class }); // backward compatibility
+                        // to spring 2.0.1
                         if (!method.isAccessible()) {
                             method.setAccessible(true);
                         }
-                        method.invoke(applicationContext, new Object[]{this});
+                        method.invoke(applicationContext, new Object[] { this });
                         supportedApplicationListener = true;
                     } catch (Throwable t2) {
                     }
@@ -116,6 +126,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     @Override
     public void onApplicationEvent(ContextRefreshedEvent event) {
+        // 是否有延迟导出 && 是否已导出 && 是不是已被取消导出
         if (isDelay() && !isExported() && !isUnexported()) {
             if (logger.isInfoEnabled()) {
                 logger.info("The service ready on spring started. service: " + getInterface());
@@ -134,12 +145,16 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "deprecation"})
+    @SuppressWarnings( { "unchecked", "deprecation" })
     public void afterPropertiesSet() throws Exception {
         if (getProvider() == null) {
-            Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProviderConfig.class, false, false);
+            Map<String, ProviderConfig> providerConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            ProviderConfig.class, false, false);
             if (providerConfigMap != null && providerConfigMap.size() > 0) {
-                Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
+                Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null
+                        : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                                ProtocolConfig.class, false, false);
                 if ((protocolConfigMap == null || protocolConfigMap.size() == 0)
                         && providerConfigMap.size() > 1) { // backward compatibility
                     List<ProviderConfig> providerConfigs = new ArrayList<ProviderConfig>();
@@ -156,7 +171,10 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                     for (ProviderConfig config : providerConfigMap.values()) {
                         if (config.isDefault() == null || config.isDefault().booleanValue()) {
                             if (providerConfig != null) {
-                                throw new IllegalStateException("Duplicate provider configs: " + providerConfig + " and " + config);
+                                throw new IllegalStateException("Duplicate provider configs: "
+                                        + providerConfig
+                                        + " and "
+                                        + config);
                             }
                             providerConfig = config;
                         }
@@ -169,13 +187,18 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
         if (getApplication() == null
                 && (getProvider() == null || getProvider().getApplication() == null)) {
-            Map<String, ApplicationConfig> applicationConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ApplicationConfig.class, false, false);
+            Map<String, ApplicationConfig> applicationConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            ApplicationConfig.class, false, false);
             if (applicationConfigMap != null && applicationConfigMap.size() > 0) {
                 ApplicationConfig applicationConfig = null;
                 for (ApplicationConfig config : applicationConfigMap.values()) {
                     if (config.isDefault() == null || config.isDefault().booleanValue()) {
                         if (applicationConfig != null) {
-                            throw new IllegalStateException("Duplicate application configs: " + applicationConfig + " and " + config);
+                            throw new IllegalStateException("Duplicate application configs: "
+                                    + applicationConfig
+                                    + " and "
+                                    + config);
                         }
                         applicationConfig = config;
                     }
@@ -187,13 +210,16 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         }
         if (getModule() == null
                 && (getProvider() == null || getProvider().getModule() == null)) {
-            Map<String, ModuleConfig> moduleConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ModuleConfig.class, false, false);
+            Map<String, ModuleConfig> moduleConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            ModuleConfig.class, false, false);
             if (moduleConfigMap != null && moduleConfigMap.size() > 0) {
                 ModuleConfig moduleConfig = null;
                 for (ModuleConfig config : moduleConfigMap.values()) {
                     if (config.isDefault() == null || config.isDefault().booleanValue()) {
                         if (moduleConfig != null) {
-                            throw new IllegalStateException("Duplicate module configs: " + moduleConfig + " and " + config);
+                            throw new IllegalStateException(
+                                    "Duplicate module configs: " + moduleConfig + " and " + config);
                         }
                         moduleConfig = config;
                     }
@@ -204,9 +230,15 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
             }
         }
         if ((getRegistries() == null || getRegistries().isEmpty())
-                && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().isEmpty())
-                && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().isEmpty())) {
-            Map<String, RegistryConfig> registryConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, RegistryConfig.class, false, false);
+                && (getProvider() == null
+                || getProvider().getRegistries() == null
+                || getProvider().getRegistries().isEmpty())
+                && (getApplication() == null
+                || getApplication().getRegistries() == null
+                || getApplication().getRegistries().isEmpty())) {
+            Map<String, RegistryConfig> registryConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            RegistryConfig.class, false, false);
             if (registryConfigMap != null && registryConfigMap.size() > 0) {
                 List<RegistryConfig> registryConfigs = new ArrayList<RegistryConfig>();
                 for (RegistryConfig config : registryConfigMap.values()) {
@@ -222,13 +254,18 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
         if (getMonitor() == null
                 && (getProvider() == null || getProvider().getMonitor() == null)
                 && (getApplication() == null || getApplication().getMonitor() == null)) {
-            Map<String, MonitorConfig> monitorConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, MonitorConfig.class, false, false);
+            Map<String, MonitorConfig> monitorConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            MonitorConfig.class, false, false);
             if (monitorConfigMap != null && monitorConfigMap.size() > 0) {
                 MonitorConfig monitorConfig = null;
                 for (MonitorConfig config : monitorConfigMap.values()) {
                     if (config.isDefault() == null || config.isDefault().booleanValue()) {
                         if (monitorConfig != null) {
-                            throw new IllegalStateException("Duplicate monitor configs: " + monitorConfig + " and " + config);
+                            throw new IllegalStateException("Duplicate monitor configs: "
+                                    + monitorConfig
+                                    + " and "
+                                    + config);
                         }
                         monitorConfig = config;
                     }
@@ -239,8 +276,12 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
             }
         }
         if ((getProtocols() == null || getProtocols().isEmpty())
-                && (getProvider() == null || getProvider().getProtocols() == null || getProvider().getProtocols().isEmpty())) {
-            Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext, ProtocolConfig.class, false, false);
+                && (getProvider() == null
+                || getProvider().getProtocols() == null
+                || getProvider().getProtocols().isEmpty())) {
+            Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null
+                    : BeanFactoryUtils.beansOfTypeIncludingAncestors(applicationContext,
+                            ProtocolConfig.class, false, false);
             if (protocolConfigMap != null && protocolConfigMap.size() > 0) {
                 List<ProtocolConfig> protocolConfigs = new ArrayList<ProtocolConfig>();
                 for (ProtocolConfig config : protocolConfigMap.values()) {
@@ -267,7 +308,8 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
 
     @Override
     public void destroy() throws Exception {
-        // This will only be called for singleton scope bean, and expected to be called by spring shutdown hook when BeanFactory/ApplicationContext destroys.
+        // This will only be called for singleton scope bean, and expected to be called by spring
+        // shutdown hook when BeanFactory/ApplicationContext destroys.
         // We will guarantee dubbo related resources being released with dubbo shutdown hook.
         //unexport();
     }

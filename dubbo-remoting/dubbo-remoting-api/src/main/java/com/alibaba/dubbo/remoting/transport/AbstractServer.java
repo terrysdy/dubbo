@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.transport;
 
 import com.alibaba.dubbo.common.Constants;
@@ -51,26 +52,39 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
         super(url, handler);
         localAddress = getUrl().toInetSocketAddress();
 
+        // 获取 ip、端口号
         String bindIp = getUrl().getParameter(Constants.BIND_IP_KEY, getUrl().getHost());
         int bindPort = getUrl().getParameter(Constants.BIND_PORT_KEY, getUrl().getPort());
         if (url.getParameter(Constants.ANYHOST_KEY, false) || NetUtils.isInvalidLocalHost(bindIp)) {
             bindIp = NetUtils.ANYHOST;
         }
         bindAddress = new InetSocketAddress(bindIp, bindPort);
+
+        // 最大连接数
         this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
-        this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);
+        // 空连接失效时间
+        this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY,
+                Constants.DEFAULT_IDLE_TIMEOUT);
         try {
             doOpen();
             if (logger.isInfoEnabled()) {
-                logger.info("Start " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());
+                logger.info("Start "
+                        + getClass().getSimpleName()
+                        + " bind "
+                        + getBindAddress()
+                        + ", export "
+                        + getLocalAddress());
             }
         } catch (Throwable t) {
-            throw new RemotingException(url.toInetSocketAddress(), null, "Failed to bind " + getClass().getSimpleName()
-                    + " on " + getLocalAddress() + ", cause: " + t.getMessage(), t);
+            throw new RemotingException(url.toInetSocketAddress(), null,
+                    "Failed to bind " + getClass().getSimpleName()
+                            + " on " + getLocalAddress() + ", cause: " + t.getMessage(), t);
         }
         //fixme replace this with better method
-        DataStore dataStore = ExtensionLoader.getExtensionLoader(DataStore.class).getDefaultExtension();
-        executor = (ExecutorService) dataStore.get(Constants.EXECUTOR_SERVICE_COMPONENT_KEY, Integer.toString(url.getPort()));
+        DataStore dataStore = ExtensionLoader.getExtensionLoader(DataStore.class)
+                .getDefaultExtension();
+        executor = (ExecutorService) dataStore.get(Constants.EXECUTOR_SERVICE_COMPONENT_KEY,
+                Integer.toString(url.getPort()));
     }
 
     protected abstract void doOpen() throws Throwable;
@@ -142,7 +156,12 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
     @Override
     public void close() {
         if (logger.isInfoEnabled()) {
-            logger.info("Close " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());
+            logger.info("Close "
+                    + getClass().getSimpleName()
+                    + " bind "
+                    + getBindAddress()
+                    + ", export "
+                    + getLocalAddress());
         }
         ExecutorUtil.shutdownNow(executor, 100);
         try {
@@ -184,14 +203,22 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
     public void connected(Channel ch) throws RemotingException {
         // If the server has entered the shutdown process, reject any new connection
         if (this.isClosing() || this.isClosed()) {
-            logger.warn("Close new channel " + ch + ", cause: server is closing or has been closed. For example, receive a new connect request while in shutdown process.");
+            logger.warn("Close new channel "
+                    + ch
+                    + ", cause: server is closing or has been closed. For example, receive a new "
+                    + "connect request while in shutdown process.");
             ch.close();
             return;
         }
 
         Collection<Channel> channels = getChannels();
         if (accepts > 0 && channels.size() > accepts) {
-            logger.error("Close channel " + ch + ", cause: The server " + ch.getLocalAddress() + " connections greater than max config " + accepts);
+            logger.error("Close channel "
+                    + ch
+                    + ", cause: The server "
+                    + ch.getLocalAddress()
+                    + " connections greater than max config "
+                    + accepts);
             ch.close();
             return;
         }
@@ -202,9 +229,10 @@ public abstract class AbstractServer extends AbstractEndpoint implements Server 
     public void disconnected(Channel ch) throws RemotingException {
         Collection<Channel> channels = getChannels();
         if (channels.isEmpty()) {
-            logger.warn("All clients has discontected from " + ch.getLocalAddress() + ". You can graceful shutdown now.");
+            logger.warn("All clients has discontected from "
+                    + ch.getLocalAddress()
+                    + ". You can graceful shutdown now.");
         }
         super.disconnected(ch);
     }
-
 }

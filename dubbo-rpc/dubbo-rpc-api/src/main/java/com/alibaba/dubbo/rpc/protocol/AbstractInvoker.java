@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.protocol;
 
 import com.alibaba.dubbo.common.Constants;
@@ -63,10 +64,12 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
     }
 
     public AbstractInvoker(Class<T> type, URL url, Map<String, String> attachment) {
-        if (type == null)
+        if (type == null) {
             throw new IllegalArgumentException("service type == null");
-        if (url == null)
+        }
+        if (url == null) {
             throw new IllegalArgumentException("service url == null");
+        }
         this.type = type;
         this.url = url;
         this.attachment = attachment == null ? null : Collections.unmodifiableMap(attachment);
@@ -125,30 +128,42 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
     @Override
     public Result invoke(Invocation inv) throws RpcException {
         if (destroyed.get()) {
-            throw new RpcException("Rpc invoker for service " + this + " on consumer " + NetUtils.getLocalHost()
-                    + " use dubbo version " + Version.getVersion()
-                    + " is DESTROYED, can not be invoked any more!");
+            throw new RpcException(
+                    "Rpc invoker for service " + this + " on consumer " + NetUtils.getLocalHost()
+                            + " use dubbo version " + Version.getVersion()
+                            + " is DESTROYED, can not be invoked any more!");
         }
         RpcInvocation invocation = (RpcInvocation) inv;
+        // 设置 Invoker
         invocation.setInvoker(this);
+
+        /*
+        添加信息到 attachment
+         */
         if (attachment != null && attachment.size() > 0) {
+            // 设置 attachment
             invocation.addAttachmentsIfAbsent(attachment);
         }
+        // contextAttachment 设置到 invocation 的 attachment
         Map<String, String> contextAttachments = RpcContext.getContext().getAttachments();
         if (contextAttachments != null && contextAttachments.size() != 0) {
             /**
-             * invocation.addAttachmentsIfAbsent(context){@link RpcInvocation#addAttachmentsIfAbsent(Map)}should not be used here,
-             * because the {@link RpcContext#setAttachment(String, String)} is passed in the Filter when the call is triggered
-             * by the built-in retry mechanism of the Dubbo. The attachment to update RpcContext will no longer work, which is
-             * a mistake in most cases (for example, through Filter to RpcContext output traceId and spanId and other information).
+             * invocation.addAttachmentsIfAbsent
+             * (context){@link RpcInvocation#addAttachmentsIfAbsent(Map)}should not be used here,
+             * because the {@link RpcContext#setAttachment(String, String)} is passed in the
+             * Filter when the call is triggered
+             * by the built-in retry mechanism of the Dubbo. The attachment to update RpcContext
+             * will no longer work, which is
+             * a mistake in most cases (for example, through Filter to RpcContext output traceId
+             * and spanId and other information).
              */
             invocation.addAttachments(contextAttachments);
         }
+        // 异步信息
         if (getUrl().getMethodParameter(invocation.getMethodName(), Constants.ASYNC_KEY, false)) {
             invocation.setAttachment(Constants.ASYNC_KEY, Boolean.TRUE.toString());
         }
         RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
-
 
         try {
             return doInvoke(invocation);
@@ -174,5 +189,4 @@ public abstract class AbstractInvoker<T> implements Invoker<T> {
     }
 
     protected abstract Result doInvoke(Invocation invocation) throws Throwable;
-
 }

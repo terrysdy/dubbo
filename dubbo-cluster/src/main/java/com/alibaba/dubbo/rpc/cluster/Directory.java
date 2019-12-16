@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster;
 
 import com.alibaba.dubbo.common.Node;
@@ -24,6 +25,8 @@ import com.alibaba.dubbo.rpc.RpcException;
 import java.util.List;
 
 /**
+ * 服务目录，维护 Invoker 列表
+ * <p>
  * Directory. (SPI, Prototype, ThreadSafe)
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Directory_service">Directory Service</a>
@@ -45,5 +48,4 @@ public interface Directory<T> extends Node {
      * @return invokers
      */
     List<Invoker<T>> list(Invocation invocation) throws RpcException;
-
 }

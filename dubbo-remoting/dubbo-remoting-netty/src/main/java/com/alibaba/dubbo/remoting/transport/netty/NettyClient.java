@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.transport.netty;
 
 import com.alibaba.dubbo.common.Constants;
@@ -48,11 +49,13 @@ public class NettyClient extends AbstractClient {
 
     // ChannelFactory's closure has a DirectMemory leak, using static to avoid
     // https://issues.jboss.org/browse/NETTY-424
-    private static final ChannelFactory channelFactory = new NioClientSocketChannelFactory(Executors.newCachedThreadPool(new NamedThreadFactory("NettyClientBoss", true)),
+    private static final ChannelFactory channelFactory = new NioClientSocketChannelFactory(
+            Executors.newCachedThreadPool(new NamedThreadFactory("NettyClientBoss", true)),
             Executors.newCachedThreadPool(new NamedThreadFactory("NettyClientWorker", true)),
             Constants.DEFAULT_IO_THREADS);
     private ClientBootstrap bootstrap;
 
+    // netty channel
     private volatile Channel channel; // volatile, please copy reference to use
 
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {
@@ -72,7 +75,8 @@ public class NettyClient extends AbstractClient {
         bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
             @Override
             public ChannelPipeline getPipeline() {
-                NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(), NettyClient.this);
+                NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(),
+                        NettyClient.this);
                 ChannelPipeline pipeline = Channels.pipeline();
                 pipeline.addLast("decoder", adapter.getDecoder());
                 pipeline.addLast("encoder", adapter.getEncoder());
@@ -98,7 +102,10 @@ public class NettyClient extends AbstractClient {
                     if (oldChannel != null) {
                         try {
                             if (logger.isInfoEnabled()) {
-                                logger.info("Close old netty channel " + oldChannel + " on create new netty channel " + newChannel);
+                                logger.info("Close old netty channel "
+                                        + oldChannel
+                                        + " on create new netty channel "
+                                        + newChannel);
                             }
                             oldChannel.close();
                         } finally {
@@ -109,7 +116,9 @@ public class NettyClient extends AbstractClient {
                     if (NettyClient.this.isClosed()) {
                         try {
                             if (logger.isInfoEnabled()) {
-                                logger.info("Close new netty channel " + newChannel + ", because the client closed.");
+                                logger.info("Close new netty channel "
+                                        + newChannel
+                                        + ", because the client closed.");
                             }
                             newChannel.close();
                         } finally {
@@ -121,13 +130,24 @@ public class NettyClient extends AbstractClient {
                     }
                 }
             } else if (future.getCause() != null) {
-                throw new RemotingException(this, "client(url: " + getUrl() + ") failed to connect to server "
-                        + getRemoteAddress() + ", error message is:" + future.getCause().getMessage(), future.getCause());
+                throw new RemotingException(this,
+                        "client(url: " + getUrl() + ") failed to connect to server "
+                                + getRemoteAddress() + ", error message is:" + future.getCause()
+                                .getMessage(), future.getCause());
             } else {
-                throw new RemotingException(this, "client(url: " + getUrl() + ") failed to connect to server "
-                        + getRemoteAddress() + " client-side timeout "
-                        + getConnectTimeout() + "ms (elapsed: " + (System.currentTimeMillis() - start) + "ms) from netty client "
-                        + NetUtils.getLocalHost() + " using dubbo version " + Version.getVersion());
+                throw new RemotingException(this,
+                        "client(url: "
+                                + getUrl()
+                                + ") failed to connect to server "
+                                + getRemoteAddress()
+                                + " client-side timeout "
+                                + getConnectTimeout()
+                                + "ms (elapsed: "
+                                + (System.currentTimeMillis() - start)
+                                + "ms) from netty client "
+                                + NetUtils.getLocalHost()
+                                + " using dubbo version "
+                                + Version.getVersion());
             }
         } finally {
             if (!isConnected()) {
@@ -157,9 +177,10 @@ public class NettyClient extends AbstractClient {
     @Override
     protected com.alibaba.dubbo.remoting.Channel getChannel() {
         Channel c = channel;
-        if (c == null || !c.isConnected())
+        if (c == null || !c.isConnected()) {
             return null;
+        }
+        // 获取 netty channel
         return NettyChannel.getOrAddChannel(c, getUrl(), this);
     }
-
 }

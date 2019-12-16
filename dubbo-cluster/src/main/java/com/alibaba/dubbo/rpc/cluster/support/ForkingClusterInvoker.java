@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support;
 
 import com.alibaba.dubbo.common.Constants;
@@ -36,16 +37,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Invoke a specific number of invokers concurrently, usually used for demanding real-time operations, but need to waste more service resources.
- *
+ * Invoke a specific number of invokers concurrently, usually used for demanding real-time
+ * operations, but need to waste more service resources.
+ * <p>
+ * 线程池多线程调用 provider，一个线程响应结果立即返回。适合实时性要求高的读操作场景
  * <a href="http://en.wikipedia.org/wiki/Fork_(topology)">Fork</a>
- *
  */
 public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
     /**
-     * Use {@link NamedInternalThreadFactory} to produce {@link com.alibaba.dubbo.common.threadlocal.InternalThread}
-     * which with the use of {@link com.alibaba.dubbo.common.threadlocal.InternalThreadLocal} in {@link RpcContext}.
+     * Use {@link NamedInternalThreadFactory} to produce
+     * {@link com.alibaba.dubbo.common.threadlocal.InternalThread}
+     * which with the use of {@link com.alibaba.dubbo.common.threadlocal.InternalThreadLocal} in
+     * {@link RpcContext}.
      */
     private final ExecutorService executor = Executors.newCachedThreadPool(
             new NamedInternalThreadFactory("forking-cluster-timer", true));
@@ -55,13 +59,17 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Result doInvoke(final Invocation invocation, List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    @SuppressWarnings( { "unchecked", "rawtypes" })
+    public Result doInvoke(final Invocation invocation, List<Invoker<T>> invokers,
+            LoadBalance loadbalance) throws RpcException {
         try {
             checkInvokers(invokers, invocation);
             final List<Invoker<T>> selected;
             final int forks = getUrl().getParameter(Constants.FORKS_KEY, Constants.DEFAULT_FORKS);
-            final int timeout = getUrl().getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+            final int timeout = getUrl().getParameter(Constants.TIMEOUT_KEY,
+                    Constants.DEFAULT_TIMEOUT);
+
+            // 选 forks 个 invoker
             if (forks <= 0 || forks >= invokers.size()) {
                 selected = invokers;
             } else {
@@ -74,9 +82,12 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
                     }
                 }
             }
+
             RpcContext.getContext().setInvokers((List) selected);
             final AtomicInteger count = new AtomicInteger();
+            // 保存结果的 BlockingQueue
             final BlockingQueue<Object> ref = new LinkedBlockingQueue<Object>();
+            // 线程池并发调用将结果 offer 进 BlockingQueue
             for (final Invoker<T> invoker : selected) {
                 executor.execute(new Runnable() {
                     @Override
@@ -93,15 +104,25 @@ public class ForkingClusterInvoker<T> extends AbstractClusterInvoker<T> {
                     }
                 });
             }
+
+            // 一旦从 BlockingQueue 中获取到结果就返回
             try {
                 Object ret = ref.poll(timeout, TimeUnit.MILLISECONDS);
                 if (ret instanceof Throwable) {
                     Throwable e = (Throwable) ret;
-                    throw new RpcException(e instanceof RpcException ? ((RpcException) e).getCode() : 0, "Failed to forking invoke provider " + selected + ", but no luck to perform the invocation. Last error is: " + e.getMessage(), e.getCause() != null ? e.getCause() : e);
+                    throw new RpcException(
+                            e instanceof RpcException ? ((RpcException) e).getCode() : 0,
+                            "Failed to forking invoke provider "
+                                    + selected
+                                    + ", but no luck to perform the invocation. Last error is: "
+                                    + e.getMessage(), e.getCause() != null ? e.getCause() : e);
                 }
                 return (Result) ret;
             } catch (InterruptedException e) {
-                throw new RpcException("Failed to forking invoke provider " + selected + ", but no luck to perform the invocation. Last error is: " + e.getMessage(), e);
+                throw new RpcException("Failed to forking invoke provider "
+                        + selected
+                        + ", but no luck to perform the invocation. Last error is: "
+                        + e.getMessage(), e);
             }
         } finally {
             // clear attachments which is binding to current thread.

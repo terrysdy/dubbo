@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.exchange;
 
 import com.alibaba.dubbo.common.Constants;
@@ -47,15 +48,18 @@ public class Exchangers {
         return bind(url, new ChannelHandlerAdapter(), replier);
     }
 
-    public static ExchangeServer bind(String url, ChannelHandler handler, Replier<?> replier) throws RemotingException {
+    public static ExchangeServer bind(String url, ChannelHandler handler, Replier<?> replier)
+            throws RemotingException {
         return bind(URL.valueOf(url), handler, replier);
     }
 
-    public static ExchangeServer bind(URL url, ChannelHandler handler, Replier<?> replier) throws RemotingException {
+    public static ExchangeServer bind(URL url, ChannelHandler handler, Replier<?> replier)
+            throws RemotingException {
         return bind(url, new ExchangeHandlerDispatcher(replier, handler));
     }
 
-    public static ExchangeServer bind(String url, ExchangeHandler handler) throws RemotingException {
+    public static ExchangeServer bind(String url, ExchangeHandler handler)
+            throws RemotingException {
         return bind(URL.valueOf(url), handler);
     }
 
@@ -67,6 +71,8 @@ public class Exchangers {
             throw new IllegalArgumentException("handler == null");
         }
         url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
+        // 获取 Exchanger，默认为 HeaderExchanger。
+        // 紧接着调用 HeaderExchanger 的 bind 方法创建 ExchangeServer 实例
         return getExchanger(url).bind(url, handler);
     }
 
@@ -86,19 +92,23 @@ public class Exchangers {
         return connect(url, new ChannelHandlerAdapter(), replier);
     }
 
-    public static ExchangeClient connect(String url, ChannelHandler handler, Replier<?> replier) throws RemotingException {
+    public static ExchangeClient connect(String url, ChannelHandler handler, Replier<?> replier)
+            throws RemotingException {
         return connect(URL.valueOf(url), handler, replier);
     }
 
-    public static ExchangeClient connect(URL url, ChannelHandler handler, Replier<?> replier) throws RemotingException {
+    public static ExchangeClient connect(URL url, ChannelHandler handler, Replier<?> replier)
+            throws RemotingException {
         return connect(url, new ExchangeHandlerDispatcher(replier, handler));
     }
 
-    public static ExchangeClient connect(String url, ExchangeHandler handler) throws RemotingException {
+    public static ExchangeClient connect(String url, ExchangeHandler handler)
+            throws RemotingException {
         return connect(URL.valueOf(url), handler);
     }
 
-    public static ExchangeClient connect(URL url, ExchangeHandler handler) throws RemotingException {
+    public static ExchangeClient connect(URL url, ExchangeHandler handler)
+            throws RemotingException {
         if (url == null) {
             throw new IllegalArgumentException("url == null");
         }
@@ -117,5 +127,4 @@ public class Exchangers {
     public static Exchanger getExchanger(String type) {
         return ExtensionLoader.getExtensionLoader(Exchanger.class).getExtension(type);
     }
-
 }

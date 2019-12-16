@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster;
 
 import com.alibaba.dubbo.common.extension.Adaptive;
@@ -27,20 +28,18 @@ import com.alibaba.dubbo.rpc.cluster.support.FailoverCluster;
  * <p>
  * <a href="http://en.wikipedia.org/wiki/Computer_cluster">Cluster</a>
  * <a href="http://en.wikipedia.org/wiki/Fault-tolerant_system">Fault-Tolerant</a>
- *
  */
 @SPI(FailoverCluster.NAME)
 public interface Cluster {
 
     /**
      * Merge the directory invokers to a virtual invoker.
+     * <p>
+     * 根据服务字典生成 cluster Invoker
      *
-     * @param <T>
-     * @param directory
      * @return cluster invoker
      * @throws RpcException
      */
     @Adaptive
     <T> Invoker<T> join(Directory<T> directory) throws RpcException;
-
 }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.protocol.dubbo;
 
 import com.alibaba.dubbo.common.logger.Logger;
@@ -53,7 +54,8 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
 
     private volatile boolean hasDecoded;
 
-    public DecodeableRpcResult(Channel channel, Response response, InputStream is, Invocation invocation, byte id) {
+    public DecodeableRpcResult(Channel channel, Response response, InputStream is,
+            Invocation invocation, byte id) {
         Assert.notNull(channel, "channel == null");
         Assert.notNull(response, "response == null");
         Assert.notNull(is, "inputStream == null");
@@ -73,7 +75,8 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
     public Object decode(Channel channel, InputStream input) throws IOException {
         ObjectInput in = CodecSupport.getSerialization(channel.getUrl(), serializationType)
                 .deserialize(channel.getUrl(), input);
-        
+
+        // 解码响应类型
         byte flag = in.readByte();
         switch (flag) {
             case DubboCodec.RESPONSE_NULL_VALUE:
@@ -91,8 +94,10 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
             case DubboCodec.RESPONSE_WITH_EXCEPTION:
                 try {
                     Object obj = in.readObject();
-                    if (obj instanceof Throwable == false)
-                        throw new IOException("Response data error, expect Throwable, but get " + obj);
+                    if (obj instanceof Throwable == false) {
+                        throw new IOException(
+                                "Response data error, expect Throwable, but get " + obj);
+                    }
                     setException((Throwable) obj);
                 } catch (ClassNotFoundException e) {
                     throw new IOException(StringUtils.toString("Read response data failed.", e));
@@ -107,10 +112,13 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
                 break;
             case DubboCodec.RESPONSE_VALUE_WITH_ATTACHMENTS:
                 try {
+                    // 获取返回值类型
                     Type[] returnType = RpcUtils.getReturnTypes(invocation);
+                    // 反序列化调用结果，并设置结果
                     setValue(returnType == null || returnType.length == 0 ? in.readObject() :
                             (returnType.length == 1 ? in.readObject((Class<?>) returnType[0])
                                     : in.readObject((Class<?>) returnType[0], returnType[1])));
+                    // 添加 attachments
                     setAttachments((Map<String, String>) in.readObject(Map.class));
                 } catch (ClassNotFoundException e) {
                     throw new IOException(StringUtils.toString("Read response data failed.", e));
@@ -118,9 +126,13 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
                 break;
             case DubboCodec.RESPONSE_WITH_EXCEPTION_WITH_ATTACHMENTS:
                 try {
+                    // 反序列化异常对象
                     Object obj = in.readObject();
-                    if (obj instanceof Throwable == false)
-                        throw new IOException("Response data error, expect Throwable, but get " + obj);
+                    if (obj instanceof Throwable == false) {
+                        throw new IOException(
+                                "Response data error, expect Throwable, but get " + obj);
+                    }
+                    // 设置异常对象
                     setException((Throwable) obj);
                     setAttachments((Map<String, String>) in.readObject(Map.class));
                 } catch (ClassNotFoundException e) {
@@ -152,5 +164,4 @@ public class DecodeableRpcResult extends RpcResult implements Codec, Decodeable 
             }
         }
     }
-
 }

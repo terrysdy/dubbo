@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.protocol.dubbo;
 
 import com.alibaba.dubbo.common.Constants;
@@ -36,14 +37,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class ReferenceCountExchangeClient implements ExchangeClient {
 
     private final URL url;
+    // 引用计数
     private final AtomicInteger refenceCount = new AtomicInteger(0);
 
     //    private final ExchangeHandler handler;
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap;
     private ExchangeClient client;
 
-
-    public ReferenceCountExchangeClient(ExchangeClient client, ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap) {
+    public ReferenceCountExchangeClient(ExchangeClient client,
+            ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap) {
         this.client = client;
         refenceCount.incrementAndGet();
         this.url = client.getUrl();
@@ -165,7 +167,8 @@ final class ReferenceCountExchangeClient implements ExchangeClient {
 
     // ghost client
     private LazyConnectExchangeClient replaceWithLazyClient() {
-        // this is a defensive operation to avoid client is closed by accident, the initial state of the client is false
+        // this is a defensive operation to avoid client is closed by accident, the initial state
+        // of the client is false
         URL lazyUrl = url.addParameter(Constants.LAZY_CONNECT_INITIAL_STATE_KEY, Boolean.FALSE)
                 .addParameter(Constants.RECONNECT_KEY, Boolean.FALSE)
                 .addParameter(Constants.SEND_RECONNECT_KEY, Boolean.TRUE.toString())

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.transport.dispatcher.all;
 
 import com.alibaba.dubbo.common.URL;
@@ -30,6 +31,9 @@ import com.alibaba.dubbo.remoting.transport.dispatcher.WrappedChannelHandler;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
+/**
+ * 所有消息都派发到线程池，包括请求，响应，连接事件，断开事件等
+ */
 public class AllChannelHandler extends WrappedChannelHandler {
 
     public AllChannelHandler(ChannelHandler handler, URL url) {
@@ -42,7 +46,8 @@ public class AllChannelHandler extends WrappedChannelHandler {
         try {
             cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.CONNECTED));
         } catch (Throwable t) {
-            throw new ExecutionException("connect event", channel, getClass() + " error when process connected event .", t);
+            throw new ExecutionException("connect event", channel,
+                    getClass() + " error when process connected event .", t);
         }
     }
 
@@ -50,9 +55,11 @@ public class AllChannelHandler extends WrappedChannelHandler {
     public void disconnected(Channel channel) throws RemotingException {
         ExecutorService cexecutor = getExecutorService();
         try {
-            cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.DISCONNECTED));
+            cexecutor.execute(
+                    new ChannelEventRunnable(channel, handler, ChannelState.DISCONNECTED));
         } catch (Throwable t) {
-            throw new ExecutionException("disconnect event", channel, getClass() + " error when process disconnected event .", t);
+            throw new ExecutionException("disconnect event", channel,
+                    getClass() + " error when process disconnected event .", t);
         }
     }
 
@@ -60,22 +67,30 @@ public class AllChannelHandler extends WrappedChannelHandler {
     public void received(Channel channel, Object message) throws RemotingException {
         ExecutorService cexecutor = getExecutorService();
         try {
-            cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.RECEIVED, message));
+            // 将请求和响应消息派发到线程池中处理
+            cexecutor.execute(
+                    new ChannelEventRunnable(channel, handler, ChannelState.RECEIVED, message));
         } catch (Throwable t) {
-            //TODO A temporary solution to the problem that the exception information can not be sent to the opposite end after the thread pool is full. Need a refactoring
-            //fix The thread pool is full, refuses to call, does not return, and causes the consumer to wait for time out
-        	if(message instanceof Request && t instanceof RejectedExecutionException){
-        		Request request = (Request)message;
-        		if(request.isTwoWay()){
-        			String msg = "Server side(" + url.getIp() + "," + url.getPort() + ") threadpool is exhausted ,detail msg:" + t.getMessage();
-        			Response response = new Response(request.getId(), request.getVersion());
-        			response.setStatus(Response.SERVER_THREADPOOL_EXHAUSTED_ERROR);
-        			response.setErrorMessage(msg);
-        			channel.send(response);
-        			return;
-        		}
-        	}
-            throw new ExecutionException(message, channel, getClass() + " error when process received event .", t);
+            // 如果通信方式为双向通信，此时将 Server side ... threadpool is exhausted
+            // 错误信息封装到 Response 中，并返回给服务消费方。
+            if (message instanceof Request && t instanceof RejectedExecutionException) {
+                Request request = (Request) message;
+                if (request.isTwoWay()) {
+                    String msg = "Server side("
+                            + url.getIp()
+                            + ","
+                            + url.getPort()
+                            + ") threadpool is exhausted ,detail msg:"
+                            + t.getMessage();
+                    Response response = new Response(request.getId(), request.getVersion());
+                    response.setStatus(Response.SERVER_THREADPOOL_EXHAUSTED_ERROR);
+                    response.setErrorMessage(msg);
+                    channel.send(response);
+                    return;
+                }
+            }
+            throw new ExecutionException(message, channel,
+                    getClass() + " error when process received event .", t);
         }
     }
 
@@ -83,9 +98,11 @@ public class AllChannelHandler extends WrappedChannelHandler {
     public void caught(Channel channel, Throwable exception) throws RemotingException {
         ExecutorService cexecutor = getExecutorService();
         try {
-            cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.CAUGHT, exception));
+            cexecutor.execute(
+                    new ChannelEventRunnable(channel, handler, ChannelState.CAUGHT, exception));
         } catch (Throwable t) {
-            throw new ExecutionException("caught event", channel, getClass() + " error when process caught event .", t);
+            throw new ExecutionException("caught event", channel,
+                    getClass() + " error when process caught event .", t);
         }
     }
 }

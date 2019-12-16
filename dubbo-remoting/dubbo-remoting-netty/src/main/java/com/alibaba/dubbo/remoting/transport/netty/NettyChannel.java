@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.remoting.transport.netty;
 
 import com.alibaba.dubbo.common.Constants;
@@ -38,8 +39,10 @@ final class NettyChannel extends AbstractChannel {
 
     private static final Logger logger = LoggerFactory.getLogger(NettyChannel.class);
 
-    private static final ConcurrentMap<org.jboss.netty.channel.Channel, NettyChannel> channelMap = new ConcurrentHashMap<org.jboss.netty.channel.Channel, NettyChannel>();
+    private static final ConcurrentMap<org.jboss.netty.channel.Channel, NettyChannel> channelMap
+            = new ConcurrentHashMap<org.jboss.netty.channel.Channel, NettyChannel>();
 
+    // netty channel
     private final org.jboss.netty.channel.Channel channel;
 
     private final Map<String, Object> attributes = new ConcurrentHashMap<String, Object>();
@@ -52,10 +55,12 @@ final class NettyChannel extends AbstractChannel {
         this.channel = channel;
     }
 
-    static NettyChannel getOrAddChannel(org.jboss.netty.channel.Channel ch, URL url, ChannelHandler handler) {
+    static NettyChannel getOrAddChannel(org.jboss.netty.channel.Channel ch, URL url,
+            ChannelHandler handler) {
         if (ch == null) {
             return null;
         }
+        // getOrCreate
         NettyChannel ret = channelMap.get(ch);
         if (ret == null) {
             NettyChannel nc = new NettyChannel(ch, url, handler);
@@ -97,9 +102,16 @@ final class NettyChannel extends AbstractChannel {
         boolean success = true;
         int timeout = 0;
         try {
+            // 调用 netty channel 发送消息
             ChannelFuture future = channel.write(message);
+            // sent 的值源于 <dubbo:method sent="true/false" /> 中 sent 的配置值，有两种配置值：
+            //   1. true: 等待消息发出，消息发送失败将抛出异常
+            //   2. false: 不等待消息发出，将消息放入 IO 队列，即刻返回
+            // 默认情况下 sent = false；
             if (sent) {
-                timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+                timeout = getUrl().getPositiveParameter(Constants.TIMEOUT_KEY,
+                        Constants.DEFAULT_TIMEOUT);
+                // 等待消息发出，若在规定时间没能发出，success 会被置为 false
                 success = future.await(timeout);
             }
             Throwable cause = future.getCause();
@@ -107,12 +119,18 @@ final class NettyChannel extends AbstractChannel {
                 throw cause;
             }
         } catch (Throwable e) {
-            throw new RemotingException(this, "Failed to send message " + message + " to " + getRemoteAddress() + ", cause: " + e.getMessage(), e);
+            throw new RemotingException(this, "Failed to send message "
+                    + message
+                    + " to "
+                    + getRemoteAddress()
+                    + ", cause: "
+                    + e.getMessage(), e);
         }
 
         if (!success) {
-            throw new RemotingException(this, "Failed to send message " + message + " to " + getRemoteAddress()
-                    + "in timeout(" + timeout + "ms) limit");
+            throw new RemotingException(this,
+                    "Failed to send message " + message + " to " + getRemoteAddress()
+                            + "in timeout(" + timeout + "ms) limit");
         }
     }
 
@@ -177,13 +195,23 @@ final class NettyChannel extends AbstractChannel {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj) return true;
-        if (obj == null) return false;
-        if (getClass() != obj.getClass()) return false;
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
         NettyChannel other = (NettyChannel) obj;
         if (channel == null) {
-            if (other.channel != null) return false;
-        } else if (!channel.equals(other.channel)) return false;
+            if (other.channel != null) {
+                return false;
+            }
+        } else if (!channel.equals(other.channel)) {
+            return false;
+        }
         return true;
     }
 
@@ -191,5 +219,4 @@ final class NettyChannel extends AbstractChannel {
     public String toString() {
         return "NettyChannel [channel=" + channel + "]";
     }
-
 }

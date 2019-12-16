@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.cluster.support;
 
 import com.alibaba.dubbo.common.Constants;
@@ -35,11 +36,13 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * When invoke fails, log the initial error and retry other invokers (retry n times, which means at most n different invokers will be invoked)
+ * When invoke fails, log the initial error and retry other invokers (retry n times, which means at
+ * most n different invokers will be invoked)
  * Note that retry causes latency.
  * <p>
+ * FailoverClusterInvoker 在调用失败时，会自动切换 Invoker 进行重试。默认确配置下，Dubbo 会使用这个类作为缺省 Cluster Invoker
+ * <p>
  * <a href="http://en.wikipedia.org/wiki/Failover">Failover</a>
- *
  */
 public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
 
@@ -50,46 +53,70 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
     }
 
     @Override
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    @SuppressWarnings( { "unchecked", "rawtypes" })
+    public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers,
+            LoadBalance loadbalance) throws RpcException {
         List<Invoker<T>> copyinvokers = invokers;
         checkInvokers(copyinvokers, invocation);
-        int len = getUrl().getMethodParameter(invocation.getMethodName(), Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;
+
+        // 重试次数
+        int len = getUrl().getMethodParameter(invocation.getMethodName(), Constants.RETRIES_KEY,
+                Constants.DEFAULT_RETRIES) + 1;
         if (len <= 0) {
             len = 1;
         }
         // retry loop.
         RpcException le = null; // last exception.
-        List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(copyinvokers.size()); // invoked invokers.
+        List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(
+                copyinvokers.size()); // invoked invokers.
         Set<String> providers = new HashSet<String>(len);
+        // 循环调用，失败重试
         for (int i = 0; i < len; i++) {
             //Reselect before retry to avoid a change of candidate `invokers`.
             //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
             if (i > 0) {
                 checkWhetherDestroyed();
+                // 在进行重试前重新列举 Invoker，这样做的好处是，如果某个服务挂了，
+                // 通过调用 list 可得到最新可用的 Invoker 列表
                 copyinvokers = list(invocation);
-                // check again
+                // invoker list 判空
                 checkInvokers(copyinvokers, invocation);
             }
+            // 负载均衡选择 Invoker
             Invoker<T> invoker = select(loadbalance, invocation, copyinvokers, invoked);
+            // 添加到已调用 invoker 列表
             invoked.add(invoker);
+            // 设置到 context
             RpcContext.getContext().setInvokers((List) invoked);
             try {
+                // invoke
                 Result result = invoker.invoke(invocation);
                 if (le != null && logger.isWarnEnabled()) {
-                    logger.warn("Although retry the method " + invocation.getMethodName()
-                            + " in the service " + getInterface().getName()
-                            + " was successful by the provider " + invoker.getUrl().getAddress()
-                            + ", but there have been failed providers " + providers
-                            + " (" + providers.size() + "/" + copyinvokers.size()
-                            + ") from the registry " + directory.getUrl().getAddress()
-                            + " on the consumer " + NetUtils.getLocalHost()
-                            + " using the dubbo version " + Version.getVersion() + ". Last error is: "
+                    logger.warn("Although retry the method "
+                            + invocation.getMethodName()
+                            + " in the service "
+                            + getInterface().getName()
+                            + " was successful by the provider "
+                            + invoker.getUrl().getAddress()
+                            + ", but there have been failed providers "
+                            + providers
+                            + " ("
+                            + providers.size()
+                            + "/"
+                            + copyinvokers.size()
+                            + ") from the registry "
+                            + directory.getUrl().getAddress()
+                            + " on the consumer "
+                            + NetUtils.getLocalHost()
+                            + " using the dubbo version "
+                            + Version.getVersion()
+                            + ". Last error is: "
                             + le.getMessage(), le);
                 }
                 return result;
             } catch (RpcException e) {
                 if (e.isBiz()) { // biz exception.
+                    // 业务异常直接抛出来
                     throw e;
                 }
                 le = e;
@@ -99,6 +126,7 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 providers.add(invoker.getUrl().getAddress());
             }
         }
+        // 重试失败
         throw new RpcException(le != null ? le.getCode() : 0, "Failed to invoke the method "
                 + invocation.getMethodName() + " in the service " + getInterface().getName()
                 + ". Tried " + len + " times of the providers " + providers
@@ -106,7 +134,7 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
                 + ") from the registry " + directory.getUrl().getAddress()
                 + " on the consumer " + NetUtils.getLocalHost() + " using the dubbo version "
                 + Version.getVersion() + ". Last error is: "
-                + (le != null ? le.getMessage() : ""), le != null && le.getCause() != null ? le.getCause() : le);
+                + (le != null ? le.getMessage() : ""),
+                le != null && le.getCause() != null ? le.getCause() : le);
     }
-
 }
