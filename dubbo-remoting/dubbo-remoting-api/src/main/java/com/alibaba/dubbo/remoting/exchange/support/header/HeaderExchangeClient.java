@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * DefaultMessageClient
- * 封装心态相关逻辑，默认 ExchangeClient
+ * 封装心跳相关逻辑，默认 ExchangeClient
  */
 public class HeaderExchangeClient implements ExchangeClient {
 

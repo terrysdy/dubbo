@@ -399,7 +399,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             name = "dubbo";
         }
 
-        // 添加 side、版本、时间戳以及 pid 进程号等信息到 map 中
+        // 添加 side（provider）、版本、时间戳以及 pid 进程号等信息到 map 中
         Map<String, String> map = new HashMap<String, String>();
         map.put(Constants.SIDE_KEY, Constants.PROVIDER_SIDE);
         map.put(Constants.DUBBO_VERSION_KEY, Version.getProtocolVersion());
@@ -544,7 +544,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         // 获取上下文路径
         String host = this.findConfigedHosts(protocolConfig, registryURLs, map);
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
-        // 组装 URL
+        // 组装 URL。dubbo://{ip}:{port}/{interfaceName}?methods={method1,method2}&xxx=xxx
         URL url = new URL(name, host, port,
                 (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path,
                 map);
@@ -593,7 +593,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                                     + registryURL);
                         }
 
-                        // For providers, this is used to enable custom proxy to generate invoker
+                        // 自定义 proxy
                         String proxy = url.getParameter(Constants.PROXY_KEY);
                         if (StringUtils.isNotEmpty(proxy)) {
                             registryURL = registryURL.addParameter(Constants.PROXY_KEY, proxy);

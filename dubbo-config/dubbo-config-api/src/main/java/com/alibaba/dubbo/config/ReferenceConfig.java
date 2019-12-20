@@ -410,7 +410,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
         } else {
-            // 远程引用
+            // 远程引用，直接配置了 url
             if (url != null
                     && url.length()
                     > 0) { // user specified URL, could be peer-to-peer address, or register
@@ -460,7 +460,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             }
 
             if (urls.size() == 1) {
-                // 但注册中心/provider，直连
+                // 单注册中心/provider，直连
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
                 // 多注册中心/provider，使用 cluster 合并多 invoker

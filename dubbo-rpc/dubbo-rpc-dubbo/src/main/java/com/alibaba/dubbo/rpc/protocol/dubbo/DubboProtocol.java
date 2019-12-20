@@ -63,8 +63,11 @@ public class DubboProtocol extends AbstractProtocol {
     public static final int DEFAULT_PORT = 20880;
     private static final String IS_CALLBACK_SERVICE_INVOKE = "_isCallBackServiceInvoke";
     private static DubboProtocol INSTANCE;
+
+    // Map<key(由 group、interfaceName、version、port 组成),ExchangeServer(组合了 channel，可关联上 socket)>
     private final Map<String, ExchangeServer> serverMap = new ConcurrentHashMap<String,
-            ExchangeServer>(); // <host:port,Exchanger>
+            ExchangeServer>();
+
     private final Map<String, ReferenceCountExchangeClient> referenceClientMap =
             new ConcurrentHashMap<String, ReferenceCountExchangeClient>(); // <host:port,Exchanger>
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap =
@@ -75,6 +78,8 @@ public class DubboProtocol extends AbstractProtocol {
     //servicekey-stubmethods
     private final ConcurrentMap<String, String> stubServiceMethodsMap =
             new ConcurrentHashMap<String, String>();
+
+    // 入站最后一个 channel handler，调用 provider 暴露的 Invoker，执行业务逻辑
     private ExchangeHandler requestHandler = new ExchangeHandlerAdapter() {
 
         @Override
@@ -272,14 +277,12 @@ public class DubboProtocol extends AbstractProtocol {
     public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
         URL url = invoker.getUrl();
 
-        // export service.
         // 获取服务标识，理解成服务坐标也行。由服务组名，服务名，服务版本号以及端口组成。比如：
         // demoGroup/com.alibaba.dubbo.demo.DemoService:1.0.1:20880
         String key = serviceKey(url);
         DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
         exporterMap.put(key, exporter);
 
-        //export an stub service for dispatching event
         // 本地存根
         Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY,
                 Constants.DEFAULT_STUB_EVENT);
@@ -306,7 +309,6 @@ public class DubboProtocol extends AbstractProtocol {
     }
 
     private void openServer(URL url) {
-        // find server.
         // 获取 host:port，并将其作为服务器实例的 key，用于标识当前的服务器实例
         String key = url.getAddress();
         //client can export a service which's only for server to invoke
@@ -323,7 +325,6 @@ public class DubboProtocol extends AbstractProtocol {
     }
 
     private ExchangeServer createServer(URL url) {
-        // send readonly event when server closes, it's enabled by default
         url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY,
                 Boolean.TRUE.toString());
         // 心跳检测配置
@@ -348,7 +349,7 @@ public class DubboProtocol extends AbstractProtocol {
             throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);
         }
 
-        // client 参数，netty/mina
+        // client 参数，netty/mina，校验 transporter 类型
         str = url.getParameter(Constants.CLIENT_KEY);
         if (str != null && str.length() > 0) {
             Set<String> supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class)

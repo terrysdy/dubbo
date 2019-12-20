@@ -72,8 +72,6 @@ public class FailoverClusterInvoker<T> extends AbstractClusterInvoker<T> {
         Set<String> providers = new HashSet<String>(len);
         // 循环调用，失败重试
         for (int i = 0; i < len; i++) {
-            //Reselect before retry to avoid a change of candidate `invokers`.
-            //NOTE: if `invokers` changed, then `invoked` also lose accuracy.
             if (i > 0) {
                 checkWhetherDestroyed();
                 // 在进行重试前重新列举 Invoker，这样做的好处是，如果某个服务挂了，

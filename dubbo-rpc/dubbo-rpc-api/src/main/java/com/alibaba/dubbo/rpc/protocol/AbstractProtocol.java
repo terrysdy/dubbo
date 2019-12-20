@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.rpc.protocol;
 
 import com.alibaba.dubbo.common.Constants;
@@ -38,7 +39,9 @@ public abstract class AbstractProtocol implements Protocol {
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected final Map<String, Exporter<?>> exporterMap = new ConcurrentHashMap<String, Exporter<?>>();
+    // key -> Exporter，provider 标识映射(group、interfaceName、版本号、端口)为 Exporter(组合了 Invoker)
+    protected final Map<String, Exporter<?>> exporterMap = new ConcurrentHashMap<String,
+            Exporter<?>>();
 
     //TODO SOFEREFENCE
     protected final Set<Invoker<?>> invokers = new ConcurrentHashSet<Invoker<?>>();
@@ -49,7 +52,8 @@ public abstract class AbstractProtocol implements Protocol {
                 url.getParameter(Constants.GROUP_KEY));
     }
 
-    protected static String serviceKey(int port, String serviceName, String serviceVersion, String serviceGroup) {
+    protected static String serviceKey(int port, String serviceName, String serviceVersion,
+            String serviceGroup) {
         return ProtocolUtils.serviceKey(port, serviceName, serviceVersion, serviceGroup);
     }
 

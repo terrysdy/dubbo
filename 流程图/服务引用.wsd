@@ -1,0 +1,75 @@
+@startuml
+
+participant referenceBean as "ReferenceBean"
+participant referenceConfig as "ReferenceConfig"
+participant protocol as "RegistryProtocol"
+participant registery as "Registry"
+participant directory as "Directory"
+participant dubbo as "DubboProtocol"
+participant exchangers as "Exchangers"
+participant exchanger as "Exchanger"
+participant transporters as "Transporters"
+participant transporter as "Transporter"
+participant cluster as "Cluster"
+participant proxyFactory as "ProxyFactory"
+
+autonumber
+
+activate referenceBean
+  referenceBean -> referenceConfig: get()
+  activate referenceConfig
+    referenceConfig -> referenceConfig: 设置各项配置(ip、pid...)
+    referenceConfig -> protocol: refer()
+    note left: 创建 Invoker
+    activate protocol
+      protocol -> protocol: 初始化 Directory（服务字典）
+      protocol -> registry: register()
+      activate registry
+        registry -> registry: 创建 zk 临时节点，保存 consumer 信息
+      deactivate registry
+      protocol -> directory: subscribe()
+      note left: 监听 provider、route、configurations 变化
+      activate directory
+        directory -> registry: subscribe()
+        registry -> registry: 创建对应 zk watch
+        registry -> directory: notify()
+        note left: 通知 url,directory 更新本地缓存
+        directory -> dubbo: refer()
+        note left: 根据 provider url 创建 dubbo Invoker
+        activate dubbo
+          dubbo -> dubbo: 设置 URL 网络相关参数(心跳、编码器..)
+          dubbo -> exchangers: connect()
+          note left: 带上业务 ExchangeHandler，处理消息逻辑为调用 Invoker，真正执行业务逻辑，将作为入站处理最后一个 handler
+          activate exchangers
+            exchangers -> exchangers: 获取 Exchanger
+            exchangers -> exchanger: connect()
+            exchanger -> transporters: connect()
+            note left: 带上解码相关 ExchangeHandler
+            activate transporters
+              transporters -> transporters: 获取 Transporter
+              transporters -> transporter: connect()
+              activate transporter
+                transporter -> transporter: 设置超时时间等 client 参数
+                transporter -> transporter: doOpen()
+                note left: 初始化 netty ClientBootstrap，设置 channel handler
+                transporter -> transporter: connect()
+                note left: 与 provider 创建 tcp 连接（多 provider 实例看下？）
+                transporter -> transporter: 保存 channel
+              deactivate transporter
+            deactivate transporters
+          deactivate exchangers
+          dubbo -> dubbo: 保存 ip:port 对应 ExchangeClient
+          note left: ExchangeClient 与 channel 一一对应
+        deactivate dubbo
+        directory -> directory: 更新 Invoker 字典
+      deactivate directory
+      protocol -> cluster: join()
+      note left: 默认响应为 MockClusterInvoker 包了 FailoverClusterInvoker
+    deactivate protocol
+    referenceConfig -> proxyFactory: getProxy()
+    note left: 生成 invoker 代理对象
+  deactivate referenceConfig
+deactivate referenceBean
+
+
+@enduml

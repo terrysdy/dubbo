@@ -1,0 +1,93 @@
+@startuml
+
+autonumber
+participant invokerInvocationHandler as "InvokerInvocationHandler"
+participant mockClusterInvoker as "MockClusterInvoker"
+participant clusterInvoker as "ClusterInvoker"
+participant directory as "Directory"
+participant router as "Router"
+participant loadBalance as "LoadBalance"
+participant protocolFilterWrapper as "ProtocolFilterWrapper"
+participant filter as "Filter"
+participant dubboInvoker as "DubboInvoker"
+participant exchangeClient as "ExchangeClient"
+participant exchangeChannel as "ExchangeChannel"
+participant channel as "Channel"
+participant provider as "provider"
+participant channelHandler as "ChannleHandler"
+participant defaultFuture as "DefaultFuture"
+
+activate invokerInvocationHandler
+  invokerInvocationHandler -> mockClusterInvoker: invoke
+  note left: MockClusterInvoker 包含服务降级处理
+  mockClusterInvoker -> clusterInvoker
+  activate clusterInvoker
+    clusterInvoker -> directory: list()
+    note left: 使用服务字典获取 Invoker 列表
+    activate directory
+      directory -> directory: 根据方法名获取 Invoker 列表
+      directory -> router: route()
+      note left
+        服务路由，筛选符合配置的路由规则的 provider Invoker
+        可配 consumer ip 路由到 provider ip
+      end note
+    deactivate directory
+    clusterInvoker -> clusterInvoker: doInvoker()
+    note left
+      不同 cluster 集群容错规则不同
+      主要区别在于
+        1. 调用 Invoker 失败后对异常的处理（直接抛异常/换个 invoker 重试/不抛异常只打日志/异步重试）【默认异常同步重试】
+        2. 单线程/ folk join 方式调用多 invoker
+        3. 只会成功调一个 invoker/ broadcast 所有 invoker
+    end note
+    clusterInvoker -> loadBalance: select()
+    note left
+      负载均衡
+      1. 一致性 hash
+      2. 最小活跃数（provider 当前正在处理的请求数）
+      3. 加权随机【默认】
+      4. 加权轮询
+    end note
+    clusterInvoker -> protocolFilterWrapper: invoke()
+    note left
+      内部构造了 Invoker 的 filter 链，类似装饰器模式
+      filter1(filter2(filter3(dubboInvoker)))
+    end note
+    protocolFilterWrapper -> dubboInvoker: invoke()
+    activate dubboInvoker
+      dubboInvoker -> exchangeClient: request()
+      note left: 响应 ResponseFuture，可同步/异步，同步则直接调用 ResponseFuture.get()
+      activate exchangeClient
+        exchangeClient -> exchangeChannel: request()
+        activate exchangeChannel
+          exchangeChannel -> exchangeChannel: 构建 ResponseFuture
+          exchangeChannel -> channel: send()
+          note left: 调用 netty channel send
+          channel --> provider: 调用消息
+        deactivate exchangeChannel
+      deactivate exchangeClient
+    deactivate dubboInvoker
+  deactivate clusterInvoker
+deactivate invokerInvocationHandler
+
+provider --> channel: response
+channel -> channelHandler: received()
+note left: 沿着服务引用时构建的 channelHandler 链执行解码等操作
+channelHandler -> defaultFuture: received()
+activate defaultFuture
+  defaultFuture -> defaultFuture: 找到 defaultFuture 实例
+  note left: DefaultFuture 中类变量中保存了 Map<requestId,DefaultFuture>
+  defaultFuture -> defaultFuture: 唤醒用户线程
+  note left
+    defaultFuture.get() 时调用了 Condition done.await()，用户线程阻塞
+    接收响应，调用 done.signal()，唤醒用户线程(即 dubboInvoker.invoke())
+  end note
+  defaultFuture -> dubboInvoker: response
+deactivate defaultFuture
+dubboInvoker -> clusterInvoker: response
+clusterInvoker -> invokerInvocationHandler: response
+
+
+
+
+@enduml

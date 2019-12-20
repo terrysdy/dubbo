@@ -1,0 +1,81 @@
+@startuml
+
+autonumber
+participant spring as "spring"
+participant serviceBean as "ServiceBean"
+participant serviceConfig as "ServiceConfig"
+participant proxyFactory as "ProxyFactory"
+participant protocol as "Protocol"
+participant exchangers as "Exchangers"
+participant exchanger as "Exchanger"
+participant transporters as "Transporters"
+participant transporter as "Transporter"
+participant registry as "Registry"
+
+activate spring
+  spring --> serviceBean: application event
+  note left: 通知已完成 spring 容器初始化
+deactivate spring
+
+activate serviceBean
+  serviceBean -> serviceBean: 检查基础配置(application、registries、protocols)
+  note left: 一般在 spring 加载 bean 时根据配置已设置具体配置
+  serviceBean -> serviceConfig: doExportUrls()
+  note left: 在各个协议中导出服务
+  activate serviceConfig
+    serviceConfig -> serviceConfig: 根据配置设置 interfaceClass
+    serviceConfig -> serviceConfig: 拼接 provider URL
+    note left: {protocol}://{ip}:{port}/{interfaceName}?methods={method1},{method2}&intereface={interfaceName}&pid=&...
+
+    activate proxyFactory
+      serviceConfig -> proxyFactory: getInvoker()
+      note left: 生成代理 Invoker，默认使用 javassist
+    deactivate proxyFactory
+
+    activate protocol
+      serviceConfig -> protocol: export()
+      note left: 开始暴露服务
+      protocol -> protocol: 创建 Exporter，并保存 key -> exporter 映射缓存
+      note left
+        key 由 group、interfaceName、version、port 组成
+        Exporter 组合了 Invoker，可执行真实 provider 业务逻辑
+      end note
+
+      protocol -> protocol: URL 添加心跳、server(默认为 netty)、编码器参数
+      protocol -> exchangers: bind()
+      note left: 带上业务 ExchangeHandler，处理消息逻辑为调用 Invoker，真正执行业务逻辑，将作为入站处理最后一个 handler
+      activate exchangers
+        exchangers -> exchangers: 获取 Exchanger
+        exchangers -> exchange: bind()
+        activate exchanger
+          exchanger -> transporters: bind()
+          note left: 带上解码相关 ExchangeHandler
+          activate transporters
+            transporters -> transporter: bind()
+            activate transporter
+              transporter -> transporter: 设置 ip、端口、最大连接数、空链接失效时间、超时时间等 server 参数
+              transporter -> transporter: doOpen()
+              note left: 开启 socket listen（初始化 netty ServerBootstrap），添加 exchangeHandler
+            deactivate transporter
+          deactivate transporters
+        deactivate exchanger
+      deactivate exchangers
+
+      protocol -> registry: register()
+      activate register
+        register -> register: 创建对应 provider 节点
+        note left: zk 临时节点
+      deactivate register
+      protocol -> register: subscribe()
+      activate register
+        register -> register: 添加节点监听器
+      deactivate register
+
+    deactivate protocol
+
+
+  deactivate serviceConfig
+deactivate serviceBean
+
+
+@enduml

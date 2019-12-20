@@ -46,7 +46,7 @@ public class DefaultFuture implements ResponseFuture {
 
     private static final Map<Long, Channel> CHANNELS = new ConcurrentHashMap<Long, Channel>();
 
-    // Map<requestId,Future>
+    // Map<requestId,Future>。类变量
     private static final Map<Long, DefaultFuture> FUTURES = new ConcurrentHashMap<Long,
             DefaultFuture>();
 
