@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.registry.support;
 
 import com.alibaba.dubbo.common.Constants;
@@ -51,26 +52,30 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AbstractRegistry. (SPI, Prototype, ThreadSafe)
- *
  */
 public abstract class AbstractRegistry implements Registry {
 
     // URL address separator, used in file cache, service provider URL separation
     private static final char URL_SEPARATOR = ' ';
-    // URL address separated regular expression for parsing the service provider URL list in the file cache
+    // URL address separated regular expression for parsing the service provider URL list in the
+    // file cache
     private static final String URL_SPLIT = "\\s+";
     // Log output
     protected final Logger logger = LoggerFactory.getLogger(getClass());
-    // Local disk cache, where the special key value.registies records the list of registry centers, and the others are the list of notified service providers
+    // Local disk cache, where the special key value.registies records the list of registry
+    // centers, and the others are the list of notified service providers
     private final Properties properties = new Properties();
     // File cache timing writing
-    private final ExecutorService registryCacheExecutor = Executors.newFixedThreadPool(1, new NamedThreadFactory("DubboSaveRegistryCache", true));
+    private final ExecutorService registryCacheExecutor = Executors.newFixedThreadPool(1,
+            new NamedThreadFactory("DubboSaveRegistryCache", true));
     // Is it synchronized to save the file
     private final boolean syncSaveFile;
     private final AtomicLong lastCacheChanged = new AtomicLong();
     private final Set<URL> registered = new ConcurrentHashSet<URL>();
-    private final ConcurrentMap<URL, Set<NotifyListener>> subscribed = new ConcurrentHashMap<URL, Set<NotifyListener>>();
-    private final ConcurrentMap<URL, Map<String, List<URL>>> notified = new ConcurrentHashMap<URL, Map<String, List<URL>>>();
+    private final ConcurrentMap<URL, Set<NotifyListener>> subscribed = new ConcurrentHashMap<URL,
+            Set<NotifyListener>>();
+    private final ConcurrentMap<URL, Map<String, List<URL>>> notified = new ConcurrentHashMap<URL
+            , Map<String, List<URL>>>();
     private URL registryUrl;
     // Local disk cache file
     private File file;
@@ -79,13 +84,19 @@ public abstract class AbstractRegistry implements Registry {
         setUrl(url);
         // Start file save timer
         syncSaveFile = url.getParameter(Constants.REGISTRY_FILESAVE_SYNC_KEY, false);
-        String filename = url.getParameter(Constants.FILE_KEY, System.getProperty("user.home") + "/.dubbo/dubbo-registry-" + url.getParameter(Constants.APPLICATION_KEY) + "-" + url.getAddress() + ".cache");
+        String filename = url.getParameter(Constants.FILE_KEY,
+                System.getProperty("user.home") + "/.dubbo/dubbo-registry-" + url.getParameter(
+                        Constants.APPLICATION_KEY) + "-" + url.getAddress() + ".cache");
         File file = null;
         if (ConfigUtils.isNotEmpty(filename)) {
             file = new File(filename);
             if (!file.exists() && file.getParentFile() != null && !file.getParentFile().exists()) {
                 if (!file.getParentFile().mkdirs()) {
-                    throw new IllegalArgumentException("Invalid registry store file " + file + ", cause: Failed to create directory " + file.getParentFile() + "!");
+                    throw new IllegalArgumentException("Invalid registry store file "
+                            + file
+                            + ", cause: Failed to create directory "
+                            + file.getParentFile()
+                            + "!");
                 }
             }
         }
@@ -158,7 +169,10 @@ public abstract class AbstractRegistry implements Registry {
                 try {
                     FileLock lock = channel.tryLock();
                     if (lock == null) {
-                        throw new IOException("Can not lock the registry cache file " + file.getAbsolutePath() + ", ignore and retry later, maybe multi java process use the file, please config: dubbo.registry.file=xxx.properties");
+                        throw new IOException("Can not lock the registry cache file "
+                                + file.getAbsolutePath()
+                                + ", ignore and retry later, maybe multi java process use the "
+                                + "file, please config: dubbo.registry.file=xxx.properties");
                     }
                     // Save
                     try {
@@ -184,7 +198,8 @@ public abstract class AbstractRegistry implements Registry {
             if (version < lastCacheChanged.get()) {
                 return;
             } else {
-                registryCacheExecutor.execute(new SaveProperties(lastCacheChanged.incrementAndGet()));
+                registryCacheExecutor.execute(
+                        new SaveProperties(lastCacheChanged.incrementAndGet()));
             }
             logger.warn("Failed to save registry store file, cause: " + e.getMessage(), e);
         }
@@ -334,7 +349,8 @@ public abstract class AbstractRegistry implements Registry {
             }
         }
         // subscribe
-        Map<URL, Set<NotifyListener>> recoverSubscribed = new HashMap<URL, Set<NotifyListener>>(getSubscribed());
+        Map<URL, Set<NotifyListener>> recoverSubscribed = new HashMap<URL, Set<NotifyListener>>(
+                getSubscribed());
         if (!recoverSubscribed.isEmpty()) {
             if (logger.isInfoEnabled()) {
                 logger.info("Recover subscribe url " + recoverSubscribed.keySet());
@@ -349,7 +365,9 @@ public abstract class AbstractRegistry implements Registry {
     }
 
     protected void notify(List<URL> urls) {
-        if (urls == null || urls.isEmpty()) return;
+        if (urls == null || urls.isEmpty()) {
+            return;
+        }
 
         for (Map.Entry<URL, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
             URL url = entry.getKey();
@@ -364,7 +382,10 @@ public abstract class AbstractRegistry implements Registry {
                     try {
                         notify(url, listener, filterEmpty(url, urls));
                     } catch (Throwable t) {
-                        logger.error("Failed to notify registry event, urls: " + urls + ", cause: " + t.getMessage(), t);
+                        logger.error("Failed to notify registry event, urls: "
+                                + urls
+                                + ", cause: "
+                                + t.getMessage(), t);
                     }
                 }
             }
@@ -389,7 +410,8 @@ public abstract class AbstractRegistry implements Registry {
         Map<String, List<URL>> result = new HashMap<String, List<URL>>();
         for (URL u : urls) {
             if (UrlUtils.isMatch(url, u)) {
-                String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+                String category = u.getParameter(Constants.CATEGORY_KEY,
+                        Constants.DEFAULT_CATEGORY);
                 List<URL> categoryList = result.get(category);
                 if (categoryList == null) {
                     categoryList = new ArrayList<URL>();
@@ -450,6 +472,8 @@ public abstract class AbstractRegistry implements Registry {
         if (logger.isInfoEnabled()) {
             logger.info("Destroy registry:" + getUrl());
         }
+
+        // 取消注册
         Set<URL> destroyRegistered = new HashSet<URL>(getRegistered());
         if (!destroyRegistered.isEmpty()) {
             for (URL url : new HashSet<URL>(getRegistered())) {
@@ -460,12 +484,20 @@ public abstract class AbstractRegistry implements Registry {
                             logger.info("Destroy unregister url " + url);
                         }
                     } catch (Throwable t) {
-                        logger.warn("Failed to unregister url " + url + " to registry " + getUrl() + " on destroy, cause: " + t.getMessage(), t);
+                        logger.warn("Failed to unregister url "
+                                + url
+                                + " to registry "
+                                + getUrl()
+                                + " on destroy, cause: "
+                                + t.getMessage(), t);
                     }
                 }
             }
         }
-        Map<URL, Set<NotifyListener>> destroySubscribed = new HashMap<URL, Set<NotifyListener>>(getSubscribed());
+
+        // 取消订阅
+        Map<URL, Set<NotifyListener>> destroySubscribed = new HashMap<URL, Set<NotifyListener>>(
+                getSubscribed());
         if (!destroySubscribed.isEmpty()) {
             for (Map.Entry<URL, Set<NotifyListener>> entry : destroySubscribed.entrySet()) {
                 URL url = entry.getKey();
@@ -476,7 +508,12 @@ public abstract class AbstractRegistry implements Registry {
                             logger.info("Destroy unsubscribe url " + url);
                         }
                     } catch (Throwable t) {
-                        logger.warn("Failed to unsubscribe url " + url + " to registry " + getUrl() + " on destroy, cause: " + t.getMessage(), t);
+                        logger.warn("Failed to unsubscribe url "
+                                + url
+                                + " to registry "
+                                + getUrl()
+                                + " on destroy, cause: "
+                                + t.getMessage(), t);
                     }
                 }
             }
@@ -489,6 +526,7 @@ public abstract class AbstractRegistry implements Registry {
     }
 
     private class SaveProperties implements Runnable {
+
         private long version;
 
         private SaveProperties(long version) {
@@ -500,5 +538,4 @@ public abstract class AbstractRegistry implements Registry {
             doSaveProperties(version);
         }
     }
-
 }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.dubbo.common.utils;
 
 import com.alibaba.dubbo.common.Constants;
@@ -28,6 +29,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class ExecutorUtil {
+
     private static final Logger logger = LoggerFactory.getLogger(ExecutorUtil.class);
     private static final ThreadPoolExecutor shutdownExecutor = new ThreadPoolExecutor(0, 1,
             0L, TimeUnit.MILLISECONDS,
@@ -45,14 +47,17 @@ public class ExecutorUtil {
 
     /**
      * Use the shutdown pattern from:
-     *  https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html
+     * https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ExecutorService.html
+     *
      * @param executor the Executor to shutdown
      * @param timeout the timeout in milliseconds before termination
      */
     public static void gracefulShutdown(Executor executor, int timeout) {
+        // 不是线程池/线程池已经中止
         if (!(executor instanceof ExecutorService) || isTerminated(executor)) {
             return;
         }
+        // 先尝试 shutdown，优雅退出线程池
         final ExecutorService es = (ExecutorService) executor;
         try {
             // Disable new tasks from being submitted
@@ -62,6 +67,8 @@ public class ExecutorUtil {
         } catch (NullPointerException ex2) {
             return;
         }
+
+        // 优雅退出超时，shutdownNow 强制退出
         try {
             // Wait a while for existing tasks to terminate
             if (!es.awaitTermination(timeout, TimeUnit.MILLISECONDS)) {
@@ -71,6 +78,8 @@ public class ExecutorUtil {
             es.shutdownNow();
             Thread.currentThread().interrupt();
         }
+
+        // 还没退出扔到线城池里再重试
         if (!isTerminated(es)) {
             newThreadToCloseExecutor(es);
         }

@@ -55,7 +55,7 @@ public class NettyClient extends AbstractClient {
             Constants.DEFAULT_IO_THREADS);
     private ClientBootstrap bootstrap;
 
-    // netty channel
+    // netty channel,connect 后 new 出来的
     private volatile Channel channel; // volatile, please copy reference to use
 
     public NettyClient(final URL url, final ChannelHandler handler) throws RemotingException {

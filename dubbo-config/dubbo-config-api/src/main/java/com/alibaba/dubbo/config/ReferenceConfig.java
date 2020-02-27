@@ -511,6 +511,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                     + " from url "
                     + invoker.getUrl());
         }
+
         // 生成代理类
         return (T) proxyFactory.getProxy(invoker);
     }

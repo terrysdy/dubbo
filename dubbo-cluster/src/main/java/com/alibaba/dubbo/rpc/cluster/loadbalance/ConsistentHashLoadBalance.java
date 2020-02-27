@@ -88,7 +88,7 @@ public class ConsistentHashLoadBalance extends AbstractLoadBalance {
             }
             for (Invoker<T> invoker : invokers) {
                 String address = invoker.getUrl().getAddress();
-                // 每个 invoker 占了四个 hash 桶
+                // 每次每个 invoker 占了四个 hash 桶
                 for (int i = 0; i < replicaNumber / 4; i++) {
                     // 对 address + i 进行 md5 运算，得到一个长度为16的字节数组
                     byte[] digest = md5(address + i);

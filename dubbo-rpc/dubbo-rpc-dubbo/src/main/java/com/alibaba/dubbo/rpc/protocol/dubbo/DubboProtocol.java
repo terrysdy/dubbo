@@ -68,8 +68,9 @@ public class DubboProtocol extends AbstractProtocol {
     private final Map<String, ExchangeServer> serverMap = new ConcurrentHashMap<String,
             ExchangeServer>();
 
+    // <host:port,Exchanger>
     private final Map<String, ReferenceCountExchangeClient> referenceClientMap =
-            new ConcurrentHashMap<String, ReferenceCountExchangeClient>(); // <host:port,Exchanger>
+            new ConcurrentHashMap<String, ReferenceCountExchangeClient>();
     private final ConcurrentMap<String, LazyConnectExchangeClient> ghostClientMap =
             new ConcurrentHashMap<String, LazyConnectExchangeClient>();
     private final ConcurrentMap<String, Object> locks = new ConcurrentHashMap<String, Object>();
@@ -506,6 +507,7 @@ public class DubboProtocol extends AbstractProtocol {
 
     @Override
     public void destroy() {
+        // 关闭 ExchangeServer（对于 provider）
         for (String key : new ArrayList<String>(serverMap.keySet())) {
             ExchangeServer server = serverMap.remove(key);
             if (server != null) {
@@ -520,6 +522,7 @@ public class DubboProtocol extends AbstractProtocol {
             }
         }
 
+        // 管理 ExchangeClient（对于 consumer）
         for (String key : new ArrayList<String>(referenceClientMap.keySet())) {
             ExchangeClient client = referenceClientMap.remove(key);
             if (client != null) {

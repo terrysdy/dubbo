@@ -79,6 +79,7 @@ public class ExtensionLoader<T> {
 
     // ==============================
 
+    // 拓展的接口。如 Protocol
     private final Class<?> type;
 
     private final ExtensionFactory objectFactory;
